@@ -28,24 +28,29 @@ class FeedbackHandler(HubOAuthenticated, RequestHandler):
     def _get_autograding_zip(self, nb) -> Optional[bytes]:
         cells = [cell["source"] for cell in nb["cells"]]
         pattern = self._create_pattern()
-        live_ids = [self._check_line(pattern, line) for item in cells for line in item if self._check_line(pattern, line)]
+        live_ids = [self._check_line(pattern, line) for item in cells for line in item.split("\n") if self._check_line(pattern, line)]
 
-        if live_ids.count == 0:
-            return None
+        if len(live_ids) == 0:
+            self.log.info("No livefeedback id in notebook")
+            return None, None
 
         live_id = live_ids[0]
+        self.log.info("Searching for grading zip with id %s", live_id)
         with self.service.session() as session:
             entry: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=live_id).first()
             if entry:
+                self.log.info("Found grading zip for %s", live_id)
                 return (live_id, entry.data)
 
-        return None
+        return None, None
 
     def get(self):
+        self.log.info("Handing live grading get request")
         pass
 
     @authenticated
     def post(self):
+        self.log.info("Handing live grading request")
         nb = json.loads(self.request.body.decode("utf-8"))
 
         id, autograderZip = self._get_autograding_zip(nb)
@@ -89,9 +94,10 @@ class FeedbackHandler(HubOAuthenticated, RequestHandler):
 
     def add_or_update_results(self, user_hash, assignment_id, user_result):
         with self.service.session() as session:
-            existing: Optional[Result] = session.query(Result).filter_by(assignment=assignment_id,user=user_hash).first()
+            existing: Optional[Result] = session.query(Result).filter_by(assignment=assignment_id, user=user_hash).first()
             if existing:
                 session.delete(existing)
+                session.commit()
             result = Result(user=user_hash, assignment=assignment_id, data=user_result.to_csv(index=False))
             session.add(result)
         return

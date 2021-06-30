@@ -77,12 +77,14 @@ class JupyterService(Application):
     def start(self):
         http_server = HTTPServer(self.app)
         url = urlparse(self.url)
-
-        http_server.listen(url.port, url.hostname)
+        http_server.bind(url.port)
+        http_server.start(16)  # forks one process per cpu
 
         IOLoop.current().start()
 
-
-if __name__ == "__main__":
+def main():
     service = JupyterService()
     service.start()
+
+if __name__ == "__main__":
+    main()
