@@ -1,29 +1,27 @@
+import logging
 import os
+import pathlib
 from urllib.parse import urlparse
 
 import sqlalchemy.orm
+from jupyterhub.services.auth import HubOAuthCallbackHandler
+from jupyterhub.utils import url_path_join
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.util.compat import contextmanager
 from tornado.httpserver import HTTPServer
 from tornado.ioloop import IOLoop
-from traitlets import default, Unicode
-
-from traitlets.config.application import Application
 from tornado.web import Application as TornadoApplication
+from traitlets import default, Unicode
+from traitlets.config.application import Application
 
-import logging
-
-from jupyterhub.services.auth import HubOAuthCallbackHandler
-from jupyterhub.utils import url_path_join
-
-from livefeedback_hub.db import Base
-from livefeedback_hub.handler import FeedbackHandler
-import pathlib
+from livefeedback_hub.db import Base, GUID_REGEX
+from livefeedback_hub.handlers.manage import FeedbackManagementHandler, FeedbackZipAddHandler, FeedbackZipUpdateHandler
+from livefeedback_hub.handlers.results import FeedbackResultsApiHandler, FeedbackResultsHandler
+from livefeedback_hub.handlers.submission import FeedbackSubmissionHandler
 
 
 class JupyterService(Application):
-
     url = Unicode()
     prefix = Unicode()
     db_url = Unicode()
@@ -34,7 +32,7 @@ class JupyterService(Application):
 
     @default("prefix")
     def _default_prefix(self):
-        return os.environ.get("JUPYTERHUB_SERVICE_PREFIX", f"/services/{self.name}/")
+        return os.environ.get("JUPYTERHUB_SERVICE_PREFIX", f"/")
 
     @default("url")
     def _default_url(self):
@@ -61,30 +59,37 @@ class JupyterService(Application):
         super().__init__(**kwargs)
         logging.basicConfig(level=logging.INFO)
         self._init_db()
-        self.log = logging.getLogger("tornado.application")
+        self.log: logging.Logger = logging.getLogger("tornado.application")
         self.app = TornadoApplication(
             [
-                (self.prefix, FeedbackHandler, {"service": self}),
+                (self.prefix, FeedbackManagementHandler, {"service": self}),
+                (url_path_join(self.prefix, "submit"), FeedbackSubmissionHandler, {"service": self}),
+                (url_path_join(self.prefix, f"manage/add"), FeedbackZipAddHandler, {"service": self}),
+                (url_path_join(self.prefix, f"manage/({GUID_REGEX})"), FeedbackZipUpdateHandler, {"service": self}),
+                (url_path_join(self.prefix, f"results/({GUID_REGEX})"), FeedbackResultsHandler, {"service": self}),
+                (url_path_join(self.prefix, f"api/results/({GUID_REGEX})"), FeedbackResultsApiHandler, {"service": self}),
                 (
                     url_path_join(self.prefix, "oauth_callback"),
                     HubOAuthCallbackHandler,
                 ),
-                (r".*", FeedbackHandler, {"service": self}),
             ],
+            template_path=os.path.join(os.path.dirname(__file__), "templates"),
+            static_path=os.path.join(os.path.dirname(__file__), "static"),
             cookie_secret=os.urandom(32),
         )
 
     def start(self):
         http_server = HTTPServer(self.app)
         url = urlparse(self.url)
-        http_server.bind(url.port)
-        http_server.start(16)  # forks one process per cpu
+        http_server.listen(url.port, url.hostname)
 
         IOLoop.current().start()
+
 
 def main():
     service = JupyterService()
     service.start()
+
 
 if __name__ == "__main__":
     main()
