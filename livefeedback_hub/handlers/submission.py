@@ -9,7 +9,7 @@ from typing import Optional
 
 import pandas as pd
 from jupyterhub.services.auth import HubOAuthenticated
-from otter import grade
+from otter.grade import containers
 from tornado.web import RequestHandler, authenticated
 
 from livefeedback_hub import core
@@ -85,8 +85,10 @@ class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
 
             os.chdir(dir)
             self.log.info(f"Launching otter-grader for {user_hash} and {id}")
-            results = grade.launch_grade(os.path.basename(pathZip), notebooks_dir=dir)
-            user_result = results[0]
+            base = "ucbdsinfra/otter-grader"
+            image = containers.build_image(os.path.basename(pathZip), base,
+                                           containers.generate_hash(os.path.basename(pathZip)))
+            user_result = containers.grade_assignments(path, image, debug=True, verbose=True)
             self.add_or_update_results(user_hash, id, user_result)
         finally:
             os.chdir(cwd)

@@ -26,7 +26,7 @@ class FeedbackResultsHandler(HubOAuthenticated, RequestHandler):
         with self.service.session() as session:
             entry: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=live_id, owner=user_hash).first()
             if not entry:
-                raise web.HTTPError(405)
+                raise web.HTTPError(403)
             else:
                 await self.render("results.html")
 
@@ -45,7 +45,7 @@ class FeedbackResultsApiHandler(HubOAuthenticated, RequestHandler):
         with self.service.session() as session:
             entry: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=live_id, owner=user_hash).first()
             if not entry:
-                raise web.HTTPError(405)
+                raise web.HTTPError(403)
             else:
                 results = session.query(Result).filter_by(assignment=live_id)
                 dataframes = [pd.read_table(io.StringIO(result.data), sep=",") for result in results]
