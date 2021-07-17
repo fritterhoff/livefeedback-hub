@@ -1,10 +1,12 @@
 import logging
 import os
 import pathlib
+
+
 from urllib.parse import urlparse
 
 import sqlalchemy.orm
-from jupyterhub.services.auth import HubOAuthCallbackHandler
+from jupyterhub.services.auth import HubAuthenticated, HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -16,9 +18,6 @@ from traitlets import default, Unicode
 from traitlets.config.application import Application
 
 from livefeedback_hub.db import Base, GUID_REGEX
-from livefeedback_hub.handlers.manage import FeedbackManagementHandler, FeedbackZipAddHandler, FeedbackZipUpdateHandler
-from livefeedback_hub.handlers.results import FeedbackResultsApiHandler, FeedbackResultsHandler
-from livefeedback_hub.handlers.submission import FeedbackSubmissionHandler
 
 
 class JupyterService(Application):
@@ -56,6 +55,10 @@ class JupyterService(Application):
             session.close()
 
     def __init__(self, **kwargs):
+        from livefeedback_hub.handlers.manage import FeedbackManagementHandler, FeedbackZipAddHandler, FeedbackZipUpdateHandler
+        from livefeedback_hub.handlers.results import FeedbackResultsApiHandler, FeedbackResultsHandler
+        from livefeedback_hub.handlers.submission import FeedbackSubmissionHandler
+
         super().__init__(**kwargs)
         logging.basicConfig(level=logging.INFO)
         self._init_db()
@@ -76,6 +79,7 @@ class JupyterService(Application):
             template_path=os.path.join(os.path.dirname(__file__), "templates"),
             static_path=os.path.join(os.path.dirname(__file__), "static"),
             cookie_secret=os.urandom(32),
+            xsrf_cookies=True,
         )
 
     def start(self):
@@ -91,5 +95,18 @@ def main():
     service.start()
 
 
-if __name__ == "__main__":
+from unittest.mock import patch, MagicMock
+
+
+@patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+def development(mock: MagicMock):
+    mock.return_value = {"name": "admin"}
     main()
+    pass
+
+
+if __name__ == "__main__":
+    if os.getenv("JUPYTERHUB_SERVICE_URL") == None:
+        development()
+    else:
+        main()

@@ -1,7 +1,7 @@
 from sqlalchemy import Column
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.schema import UniqueConstraint
-from sqlalchemy.types import Integer, String, BLOB
+from sqlalchemy.types import Integer, String, BLOB, Boolean
 
 Base = declarative_base()
 
@@ -15,6 +15,7 @@ class AutograderZip(Base):
     owner = Column(String)
     data = Column(BLOB)
     description = Column(String)
+    ready = Column(Boolean)
 
 
 class Result(Base):

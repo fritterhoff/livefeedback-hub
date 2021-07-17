@@ -10,10 +10,12 @@ from typing import Optional
 import pandas as pd
 from jupyterhub.services.auth import HubOAuthenticated
 from otter.grade import containers
+from livefeedback_hub.server import JupyterService
 from tornado.web import RequestHandler, authenticated
 
 from livefeedback_hub import core
 from livefeedback_hub.db import AutograderZip, Result, GUID_REGEX
+import otter
 
 
 class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
@@ -85,16 +87,14 @@ class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
 
             os.chdir(dir)
             self.log.info(f"Launching otter-grader for {user_hash} and {id}")
-            base = "ucbdsinfra/otter-grader"
-            image = containers.build_image(os.path.basename(pathZip), base,
-                                           containers.generate_hash(os.path.basename(pathZip)))
+            image = otter.utils.OTTER_DOCKER_IMAGE_TAG + ":" + containers.generate_hash(os.path.basename(pathZip))
             user_result = containers.grade_assignments(path, image, debug=True, verbose=True)
             self.add_or_update_results(user_hash, id, user_result)
         finally:
             os.chdir(cwd)
             shutil.rmtree(dir)
 
-    def initialize(self, service):
+    def initialize(self, service: JupyterService):
         self.service = service
         self.log: logging.Logger = service.log
 

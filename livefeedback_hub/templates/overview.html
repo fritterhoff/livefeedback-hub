@@ -12,7 +12,7 @@
     <tr>
         <td>{{ task.id }}</td>
         <td>{{ task.description }}</td>
-        <td><a href="{{ base }}{{ task.id }}">Edit</a></td>
+        <td><a href="{{ base }}manage/{{ task.id }}">Edit</a></td>
         <td><a href="{{ base }}results/{{ task.id }}">Results</a></td>
     </tr>
     {% end %}
