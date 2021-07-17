@@ -11,16 +11,18 @@ from livefeedback_hub.db import AutograderZip
 import sqlalchemy
 from livefeedback_hub.server import JupyterService
 import uuid
-from otter.grade import containers
 import os
 import tempfile
 import shutil
 from hashlib import md5
 import docker
-import otter
+from otter.grade import utils, containers
+from concurrent.futures.thread import ThreadPoolExecutor
+
+executor = ThreadPoolExecutor(max_workers=16)
 
 
-def build(service, zip):
+def build(service: JupyterService, id, zip, update=False):
     dir = tempfile.mkdtemp()
     fdZip, pathZip = tempfile.mkstemp(suffix=".zip", dir=dir)
     cwd = os.getcwd()
@@ -35,6 +37,23 @@ def build(service, zip):
     finally:
         os.chdir(cwd)
         shutil.rmtree(dir)
+    
+    with service.session() as session:
+        if update:
+            task: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=id).first()
+            m = md5()
+            m.update(task.data)
+            oldImageHash = m.hexdigest()
+            client = docker.from_env()
+            try:
+                client.images.remove(image=f"{utils.OTTER_DOCKER_IMAGE_TAG}:{oldImageHash}", force=True)
+            except docker.errors.ImageNotFound:
+                pass
+
+        item: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=id).first()
+        item.ready = True
+        item.data = zip["body"]
+    
 
 
 class FeedbackManagementHandler(HubOAuthenticated, RequestHandler):
@@ -59,7 +78,8 @@ class FeedbackZipAddHandler(HubOAuthenticated, RequestHandler):
     @authenticated
     async def get(self):
         user_hash = core.get_user_hash(self.get_current_user())
-        await self.render("add.html")
+        task = AutograderZip()
+        await self.render("edit.html", task=task, edit=False, base=self.service.prefix)
 
     @authenticated
     async def post(self):
@@ -78,12 +98,10 @@ class FeedbackZipAddHandler(HubOAuthenticated, RequestHandler):
         with self.service.session() as session:
             # get new uuid
             new_uuid = str(uuid.uuid4())
-            item = AutograderZip(id=new_uuid, owner=user_hash, zip_file=zip["body"], description=description, ready=False)
+            item = AutograderZip(id=new_uuid, owner=user_hash, data=zip["body"], description=description, ready=False)
             session.add(item)
             session.commit()
-            build(self.service, zip)
-            item.ready = True
-            session.commit()
+            executor.submit(build, self.service, new_uuid, zip)
 
 
 class FeedbackZipUpdateHandler(HubOAuthenticated, RequestHandler):
@@ -100,7 +118,7 @@ class FeedbackZipUpdateHandler(HubOAuthenticated, RequestHandler):
             if not task:
                 raise web.HTTPError(403)
             else:
-                await self.render("edit.html", task=task, base=self.service.prefix)
+                await self.render("edit.html", task=task, edit=True, base=self.service.prefix)
 
     @authenticated
     async def post(self, live_id: str):
@@ -126,19 +144,8 @@ class FeedbackZipUpdateHandler(HubOAuthenticated, RequestHandler):
 
         with self.service.session() as session:
             task: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=live_id, owner=user_hash).first()
-
-            m = md5()
-            m.update(task.data)
-            oldImageHash = m.hexdigest()
-
             # Mark as not ready, rebuild image and mark as ready afterwards
             task.ready = False
             session.commit()
-            build(self.service, zip)
-            # Mark task as ready and update database entry
-            task.ready = True
-            task.data = zip["body"]
-            session.commit()
-
-            client = docker.from_env()
-            client.images.remove(f"{otter.utils.OTTER_DOCKER_IMAGE_TAG}:{oldImageHash}")
+            executor.submit(build, self.service, live_id, zip, update=True)
+            

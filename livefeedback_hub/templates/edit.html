@@ -1,16 +1,24 @@
 {% extends "base.html" %}
 {% block content %}
 
-{{ task.id }}
+{% if edit %}
+Aktualisiere bestehenden Eintrag (ID {{ task.id }})
+{% else %}
+Neuer Eintrag
+{% end %}
 <form method="post" enctype="multipart/form-data">
-    
-  {% module xsrf_form_html() %}
-  <label for="description">Titel</label>
-<input type="text" id="description" name="description" value="{{ task.description }}"/>
-<label for="zip">Zip-Datei</label>
-<input type="file" accept=".zip" name="zip" id="zip"/>
-<input type="submit"/>
+
+    {% module xsrf_form_html() %}
+    <div>
+        <label for="description">Titel</label>
+        <input type="text" id="description" name="description" value="{{ task.description }}" />
+    </div>
+    <div>
+        <label for="zip">Zip-Datei</label>
+        <input type="file" accept=".zip" name="zip" id="zip" />
+    </div>
+    <input type="submit" />
 </form>
 
-    
+
 {% end %}
