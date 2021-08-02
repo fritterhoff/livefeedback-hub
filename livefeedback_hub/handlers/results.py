@@ -12,8 +12,8 @@ from tornado.web import RequestHandler, authenticated
 from livefeedback_hub import core
 from livefeedback_hub.db import AutograderZip, Result
 
-class FeedbackResultsHandler(HubOAuthenticated, RequestHandler):
 
+class FeedbackResultsHandler(HubOAuthenticated, RequestHandler):
     def initialize(self, service: JupyterService):
         self.service = service
         self.log: logging.Logger = service.log
@@ -29,10 +29,10 @@ class FeedbackResultsHandler(HubOAuthenticated, RequestHandler):
             if not entry:
                 raise web.HTTPError(403)
             else:
-                await self.render("results.html")
+                await self.render("results.html", task=entry, base=self.service.prefix)
+
 
 class FeedbackResultsApiHandler(HubOAuthenticated, RequestHandler):
-
     def initialize(self, service: JupyterService):
         self.service = service
         self.log: logging.Logger = service.log

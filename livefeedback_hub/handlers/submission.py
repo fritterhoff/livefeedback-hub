@@ -35,8 +35,7 @@ class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
     def _get_autograding_zip(self, nb) -> (Optional[str], Optional[bytes]):
         cells = [cell["source"] for cell in nb["cells"]]
         pattern = self._create_pattern()
-        live_ids = [self._check_line(pattern, line) for item in cells for line in item.split("\n") if
-                    self._check_line(pattern, line)]
+        live_ids = [self._check_line(pattern, line) for item in cells for line in item.split("\n") if self._check_line(pattern, line)]
 
         if len(live_ids) == 0:
             self.log.info("No live feedback id in notebook")
@@ -65,34 +64,30 @@ class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
 
         user_hash = core.get_user_hash(self.get_current_user())
 
-        self.executor.submit(self.process_notebook,
-                             autograder_zip=autograder_zip,
-                             notebook=self.request.body,
-                             id=id,
-                             user_hash=user_hash)
+        self.executor.submit(self.process_notebook, autograder_zip=autograder_zip, notebook=self.request.body, id=id, user_hash=user_hash)
         await self.finish()
 
     def process_notebook(self, autograder_zip: bytes, notebook: bytes, id: str, user_hash: str):
-        dir = tempfile.mkdtemp()
-        fd, path = tempfile.mkstemp(suffix=".ipynb", dir=dir)
-        fdZip, pathZip = tempfile.mkstemp(suffix=".zip", dir=dir)
+        tmp_dir = tempfile.mkdtemp()
+        fd, path = tempfile.mkstemp(suffix=".ipynb", dir=tmp_dir)
+        fd_zip, path_zip = tempfile.mkstemp(suffix=".zip", dir=tmp_dir)
         cwd = os.getcwd()
         try:
             with os.fdopen(fd, "wb") as tmp:
                 tmp.write(notebook)
                 tmp.flush()
-            with os.fdopen(fdZip, "wb") as tmp:
+            with os.fdopen(fd_zip, "wb") as tmp:
                 tmp.write(autograder_zip)
                 tmp.flush()
 
-            os.chdir(dir)
+            os.chdir(tmp_dir)
             self.log.info(f"Launching otter-grader for {user_hash} and {id}")
-            image = utils.OTTER_DOCKER_IMAGE_TAG + ":" + containers.generate_hash(os.path.basename(pathZip))
+            image = utils.OTTER_DOCKER_IMAGE_TAG + ":" + containers.generate_hash(os.path.basename(path_zip))
             user_result = containers.grade_assignments(path, image, debug=True, verbose=True)
             self.add_or_update_results(user_hash, id, user_result)
         finally:
             os.chdir(cwd)
-            shutil.rmtree(dir)
+            shutil.rmtree(tmp_dir)
 
     def initialize(self, service: JupyterService):
         self.service = service
@@ -100,12 +95,9 @@ class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
 
     def add_or_update_results(self, user_hash, assignment_id, user_result: pd.DataFrame):
         with self.service.session() as session:
-            existing: Optional[Result] = session.query(Result).filter_by(assignment=assignment_id,
-                                                                         user=user_hash).first()
+            existing: Optional[Result] = session.query(Result).filter_by(assignment=assignment_id, user=user_hash).first()
             if existing:
                 existing.data = user_result.to_csv(index=False)
             else:
-                result = Result(user=user_hash,
-                                assignment=assignment_id,
-                                data=user_result.to_csv(index=False))
+                result = Result(user=user_hash, assignment=assignment_id, data=user_result.to_csv(index=False))
                 session.add(result)

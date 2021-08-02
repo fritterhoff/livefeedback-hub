@@ -31,7 +31,7 @@ class JupyterService(Application):
 
     @default("prefix")
     def _default_prefix(self):
-        return os.environ.get("JUPYTERHUB_SERVICE_PREFIX", f"/")
+        return os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
 
     @default("url")
     def _default_url(self):
@@ -48,14 +48,14 @@ class JupyterService(Application):
         try:
             yield session
             session.commit()
-        except:
+        except Exception:
             session.rollback()
             raise
         finally:
             session.close()
 
     def __init__(self, **kwargs):
-        from livefeedback_hub.handlers.manage import FeedbackManagementHandler, FeedbackZipAddHandler, FeedbackZipUpdateHandler
+        from livefeedback_hub.handlers.manage import FeedbackManagementHandler, FeedbackZipAddHandler, FeedbackZipUpdateHandler, FeedbackZipDeleteHandler
         from livefeedback_hub.handlers.results import FeedbackResultsApiHandler, FeedbackResultsHandler
         from livefeedback_hub.handlers.submission import FeedbackSubmissionHandler
 
@@ -67,8 +67,9 @@ class JupyterService(Application):
             [
                 (self.prefix, FeedbackManagementHandler, {"service": self}),
                 (url_path_join(self.prefix, "submit"), FeedbackSubmissionHandler, {"service": self}),
-                (url_path_join(self.prefix, f"manage/add"), FeedbackZipAddHandler, {"service": self}),
-                (url_path_join(self.prefix, f"manage/({GUID_REGEX})"), FeedbackZipUpdateHandler, {"service": self}),
+                (url_path_join(self.prefix, "manage/add"), FeedbackZipAddHandler, {"service": self}),
+                (url_path_join(self.prefix, f"manage/edit/({GUID_REGEX})"), FeedbackZipUpdateHandler, {"service": self}),
+                (url_path_join(self.prefix, f"manage/delete/({GUID_REGEX})"), FeedbackZipDeleteHandler, {"service": self}),
                 (url_path_join(self.prefix, f"results/({GUID_REGEX})"), FeedbackResultsHandler, {"service": self}),
                 (url_path_join(self.prefix, f"api/results/({GUID_REGEX})"), FeedbackResultsApiHandler, {"service": self}),
                 (
@@ -95,18 +96,18 @@ def main():
     service.start()
 
 
-from unittest.mock import patch, MagicMock
-
-
-@patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-def development(mock: MagicMock):
-    mock.return_value = {"name": "admin"}
-    main()
-    pass
-
-
 if __name__ == "__main__":
-    if os.getenv("JUPYTERHUB_SERVICE_URL") == None:
+    if os.getenv("JUPYTERHUB_SERVICE_URL") is None:
+        from unittest.mock import patch, MagicMock
+
+        @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+        def development(get_current_user_mock: MagicMock):
+            """
+            Method for development! Mocks the user so running without
+            :param get_current_user_mock: MagicMock object representing the get_current_user method. The return value gets set to a static defined user.
+            """
+            get_current_user_mock.return_value = {"name": "admin"}
+            main()
         development()
     else:
         main()

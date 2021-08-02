@@ -5,6 +5,7 @@
     <tr>
         <th>ID</th>
         <th>Titel</th>
+        <th>Status</th>
         <th colspan="2">Optionen</th>
     </tr>
     </thead>
@@ -12,8 +13,14 @@
     <tr>
         <td>{{ task.id }}</td>
         <td>{{ task.description }}</td>
-        <td><a href="{{ base }}manage/{{ task.id }}">Edit</a></td>
-        <td><a href="{{ base }}results/{{ task.id }}">Results</a></td>
+    {% if task.ready %}
+        <td>Ok</td>
+    {% else %}
+        <td>In Verarbeitung ...</td>
+    {% end %}
+        <td><a href="{{ base }}manage/edit/{{ task.id }}">Bearbeiten</a></td>
+        <td><a href="{{ base }}results/{{ task.id }}">Ergebnisse</a></td>
+        <td><a href="{{ base }}manage/delete/{{ task.id }}">Löschen</a></td>
     </tr>
     {% end %}
 </table>
