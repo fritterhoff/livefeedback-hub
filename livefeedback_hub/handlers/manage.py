@@ -138,6 +138,7 @@ class FeedbackZipDeleteHandler(HubOAuthenticated, RequestHandler):
                 delete_docker_image(self.service, task)
                 session.delete(task)
             session.query(Result).filter_by(assignment=live_id).delete()
+        self.redirect(self.service.prefix)
 
 
 class FeedbackZipUpdateHandler(HubOAuthenticated, RequestHandler):

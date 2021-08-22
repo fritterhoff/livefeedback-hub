@@ -1,15 +1,54 @@
 {% extends "base.html" %}
 {% block content %}
+<h1>Ergebnisse</h1>
 <div id="results">
 
 </div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.5.0/dist/chart.min.js"></script>
 <script>
-    function results(){       
+
+    var setUp = false;
+
+
+
+    function handleResults(data) {
+        if (!setUp) {
+            setUp = true;
+            content = "";
+            for (const [key, value] of Object.entries(data)) {
+                if (key == "index")
+                    continue
+                content += `<div class="result"><h2>${key}</h2><div class="chart"><canvas  width="400" height="100" role="img" id="${key}"></canvas></div></div>`;
+            }
+            document.getElementById("results").innerHTML = content;
+            for (const [key, value] of Object.entries(data)) {
+                if (key == "index")
+                    continue
+                let cleaned = Object.fromEntries(Object.entries(data[key]).filter(([_, v]) => v != null));
+                var chart = new Chart(document.getElementById(key), {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(cleaned),
+                        datasets: [{
+                            label: "Vergebene Punkte",
+                            data: Object.values(cleaned),
+                            
+                        }]
+                    },
+
+                });
+            }
+        }
+
+
+    }
+
+
+    function results() {
         fetch('{{ base }}api/results/{{ task.id }}')
             .then(response => response.json())
             .then(data => {
-                console.log(data);
-                document.getElementById("results").innerHTML = JSON.stringify(data);
+                handleResults(data);
             });
     }
     results();

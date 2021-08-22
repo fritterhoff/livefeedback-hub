@@ -1,26 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
-<table>
+<table id="overview" class="table table-striped">
     <thead>
     <tr>
-        <th>ID</th>
-        <th>Titel</th>
-        <th>Status</th>
-        <th colspan="2">Optionen</th>
+        <th scope="col">ID</th>
+        <th scope="col">Titel</th>
+        <th scope="col">Status</th>
+        <th scope="col">Optionen</th>
     </tr>
     </thead>
     {% for task in tasks %}
     <tr>
-        <td>{{ task.id }}</td>
+        <td scope="row">{{ task.id }}</td>
         <td>{{ task.description }}</td>
     {% if task.ready %}
         <td>Ok</td>
     {% else %}
         <td>In Verarbeitung ...</td>
     {% end %}
-        <td><a href="{{ base }}manage/edit/{{ task.id }}">Bearbeiten</a></td>
-        <td><a href="{{ base }}results/{{ task.id }}">Ergebnisse</a></td>
-        <td><a href="{{ base }}manage/delete/{{ task.id }}">Löschen</a></td>
+        <td><a class="btn btn-primary btn-sm" href="{{ base }}results/{{ task.id }}">Ergebnisse</a>
+        <a class="btn btn-warning btn-sm" href="{{ base }}manage/edit/{{ task.id }}">Bearbeiten</a>
+        <a class="btn btn-danger btn-sm" href="{{ base }}manage/delete/{{ task.id }}">Löschen</a></td>
     </tr>
     {% end %}
 </table>

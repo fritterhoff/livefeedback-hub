@@ -79,6 +79,7 @@ class JupyterService(Application):
             ],
             template_path=os.path.join(os.path.dirname(__file__), "templates"),
             static_path=os.path.join(os.path.dirname(__file__), "static"),
+            static_url_prefix=url_path_join(self.prefix, "static/"),
             cookie_secret=os.urandom(32),
             xsrf_cookies=True,
         )

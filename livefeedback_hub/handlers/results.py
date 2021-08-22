@@ -50,8 +50,13 @@ class FeedbackResultsApiHandler(HubOAuthenticated, RequestHandler):
             else:
                 results = session.query(Result).filter_by(assignment=live_id)
                 dataframes = [pd.read_table(io.StringIO(result.data), sep=",") for result in results]
-                data = pd.concat(dataframes)
-                data = data.reset_index()
-                self.set_header("Content-Type", "application/json")
-                self.write(data.to_json(orient="index"))
+                if len(dataframes) > 0:
+                    data = pd.concat(dataframes)
+                    data = data.drop(columns=["file"])
+                    data = data.reset_index()
+                    data = data.apply(pd.value_counts)
+                    self.set_header("Content-Type", "application/json")
+                    self.write(data.to_json())
+                else:
+                    self.set_status(204)
                 await self.finish()
