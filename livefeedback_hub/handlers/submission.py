@@ -85,6 +85,8 @@ class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
             image = utils.OTTER_DOCKER_IMAGE_TAG + ":" + containers.generate_hash(os.path.basename(path_zip))
             user_result = containers.grade_assignments(path, image, debug=True, verbose=True)
             self.add_or_update_results(user_hash, id, user_result)
+        except Exception as e:
+            self.log.exception(e)
         finally:
             os.chdir(cwd)
             shutil.rmtree(tmp_dir)
