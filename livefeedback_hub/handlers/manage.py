@@ -12,9 +12,10 @@ from jupyterhub.services.auth import HubOAuthenticated
 from otter.grade import utils, containers
 from tornado import web
 from tornado.httputil import HTTPFile
-from tornado.web import RequestHandler, authenticated
+from tornado.web import RequestHandler
 
 from livefeedback_hub import core
+from livefeedback_hub.core import teacher_only
 from livefeedback_hub.db import AutograderZip, Result
 from livefeedback_hub.server import JupyterService
 
@@ -73,12 +74,13 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
         item.data = zip_file["body"]
 
 
+
 class FeedbackManagementHandler(HubOAuthenticated, RequestHandler):
     def initialize(self, service: JupyterService):
         self.service = service
         self.log: logging.Logger = service.log
 
-    @authenticated
+    @teacher_only
     async def get(self):
         user_hash = core.get_user_hash(self.get_current_user())
         with self.service.session() as session:
@@ -92,12 +94,12 @@ class FeedbackZipAddHandler(HubOAuthenticated, RequestHandler):
         self.service = service
         self.log: logging.Logger = service.log
 
-    @authenticated
+    @teacher_only
     async def get(self):
         task = AutograderZip()
         await self.render("edit.html", task=task, edit=False, base=self.service.prefix)
 
-    @authenticated
+    @teacher_only
     async def post(self):
         user_hash = core.get_user_hash(self.get_current_user())
         description = self.get_body_argument("description")
@@ -124,7 +126,7 @@ class FeedbackZipDeleteHandler(HubOAuthenticated, RequestHandler):
         self.service = service
         self.log: logging.Logger = service.log
 
-    @authenticated
+    @teacher_only
     async def get(self, live_id: str):
 
         user_hash = core.get_user_hash(self.get_current_user())
@@ -146,7 +148,7 @@ class FeedbackZipUpdateHandler(HubOAuthenticated, RequestHandler):
         self.service = service
         self.log: logging.Logger = service.log
 
-    @authenticated
+    @teacher_only
     async def get(self, live_id: str):
 
         user_hash = core.get_user_hash(self.get_current_user())
@@ -157,7 +159,7 @@ class FeedbackZipUpdateHandler(HubOAuthenticated, RequestHandler):
             else:
                 await self.render("edit.html", task=task, edit=True, base=self.service.prefix)
 
-    @authenticated
+    @teacher_only
     async def post(self, live_id: str):
 
         user_hash = core.get_user_hash(self.get_current_user())
