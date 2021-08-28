@@ -1,4 +1,3 @@
-import hashlib
 import io
 import logging
 from typing import Optional

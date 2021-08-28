@@ -6,7 +6,7 @@ import pathlib
 from urllib.parse import urlparse
 
 import sqlalchemy.orm
-from jupyterhub.services.auth import HubAuthenticated, HubOAuthCallbackHandler
+from jupyterhub.services.auth import HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

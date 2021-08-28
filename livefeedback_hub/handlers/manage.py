@@ -58,7 +58,7 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
         base = "ucbdsinfra/otter-grader"
         service.log.info(f"Building new docker image for {id}")
         image = containers.build_image(os.path.basename(path_zip), base, containers.generate_hash(os.path.basename(path_zip)))
-        service.log.info(f"Building new docker image for {id} completed")
+        service.log.info(f"Building new docker image {image} for {id} completed")
     finally:
         os.chdir(cwd)
         shutil.rmtree(tmp_dir)

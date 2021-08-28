@@ -15,7 +15,6 @@ from tornado.web import RequestHandler, authenticated
 
 from livefeedback_hub import core
 from livefeedback_hub.db import AutograderZip, Result, GUID_REGEX
-import otter
 
 
 class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
@@ -23,7 +22,7 @@ class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
 
     @staticmethod
     def _create_pattern() -> re.Pattern:
-        return re.compile(f"^#\s*LIVE:\s*({GUID_REGEX})\s*\r?\n?$", re.IGNORECASE)
+        return re.compile(r"^#\s*LIVE:\s*(%s)\s*\r?\n?$" % GUID_REGEX, re.IGNORECASE)
 
     @staticmethod
     def _check_line(pattern, line) -> Optional[str]:
