@@ -74,7 +74,6 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
         item.data = zip_file["body"]
 
 
-
 class FeedbackManagementHandler(HubOAuthenticated, RequestHandler):
     def initialize(self, service: JupyterService):
         self.service = service
