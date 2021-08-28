@@ -1,7 +1,6 @@
 """
 livefeedback setup
 """
-import json
 from pathlib import Path
 
 import setuptools
@@ -26,11 +25,7 @@ setup_args = dict(
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=setuptools.find_packages(),
-    install_requires=[
-        "otter-grader>=2.2.2",
-        "jupyterhub>=1.4.1",
-        "sqlalchemy"
-    ],
+    install_requires=["otter-grader>=3.0", "jupyterhub>=1.4.1", "sqlalchemy"],
     zip_safe=False,
     include_package_data=True,
     python_requires=">=3.6",
@@ -45,7 +40,7 @@ setup_args = dict(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Framework :: Jupyter",
-    ],    
+    ],
     entry_points={
         "console_scripts": [
             "livefeedback-hub.py = livefeedback_hub.server:main",
