@@ -5,9 +5,11 @@ import re
 import shutil
 import tempfile
 from concurrent.futures.thread import ThreadPoolExecutor
+from io import BytesIO
 from typing import Optional
 
 import pandas as pd
+import stdio_proxy
 from jupyterhub.services.auth import HubOAuthenticated
 from otter.grade import containers, utils
 from livefeedback_hub.server import JupyterService
@@ -82,7 +84,11 @@ class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
             os.chdir(tmp_dir)
             self.log.info(f"Launching otter-grader for {user_hash} and {id}")
             image = utils.OTTER_DOCKER_IMAGE_TAG + ":" + containers.generate_hash(os.path.basename(path_zip))
-            user_result = containers.grade_assignments(path, image, debug=True, verbose=True)
+
+            stdout = BytesIO()
+            stderr = BytesIO()
+            with stdio_proxy.redirect_stdout(stdout), stdio_proxy.redirect_stderr(stderr):
+                user_result = containers.grade_assignments(path, image, debug=True, verbose=True)
             self.add_or_update_results(user_hash, id, user_result)
         except Exception as e:
             self.log.exception(e)

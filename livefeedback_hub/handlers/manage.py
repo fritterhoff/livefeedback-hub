@@ -5,9 +5,12 @@ import tempfile
 import uuid
 from concurrent.futures.thread import ThreadPoolExecutor
 from hashlib import md5
+from io import BytesIO
 from typing import Optional
 
-import docker
+from python_on_whales import docker
+from python_on_whales.exceptions import NoSuchImage
+import stdio_proxy
 from jupyterhub.services.auth import HubOAuthenticated
 from otter.grade import utils, containers
 from tornado import web
@@ -32,10 +35,9 @@ def delete_docker_image(service: JupyterService, task: AutograderZip):
     m.update(task.data)
     image = f"{utils.OTTER_DOCKER_IMAGE_TAG}:{m.hexdigest()}"
     service.log.info(f"Deleting docker image {image}")
-    client = docker.from_env()
     try:
-        client.images.remove(image=image, force=True)
-    except docker.errors.ImageNotFound as e:
+        docker.image.remove(image=image, force=True)
+    except NoSuchImage as e:
         service.log.warning(f"Image not found: {e}")
 
 
@@ -58,7 +60,10 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
         os.chdir(tmp_dir)
         base = "ucbdsinfra/otter-grader"
         service.log.info(f"Building new docker image for {id}")
-        image = containers.build_image(os.path.basename(path_zip), base, containers.generate_hash(os.path.basename(path_zip)))
+        stdout = BytesIO()
+        stderr = BytesIO()
+        with stdio_proxy.redirect_stdout(stdout), stdio_proxy.redirect_stderr(stderr):
+            image = containers.build_image(os.path.basename(path_zip), base, containers.generate_hash(os.path.basename(path_zip)))
         service.log.info(f"Building new docker image {image} for {id} completed")
     finally:
         os.chdir(cwd)

@@ -13,6 +13,9 @@ name = "livefeedback-hub"
 
 long_description = (HERE / "README.md").read_text()
 
+# get requirements
+with open("requirements.txt") as f:
+    install_requires = f.readlines()
 
 setup_args = dict(
     name=name,
@@ -25,7 +28,7 @@ setup_args = dict(
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=setuptools.find_packages(),
-    install_requires=["otter-grader>=3.0", "jupyterhub>=1.4.1", "sqlalchemy"],
+    install_requires=install_requires,
     zip_safe=False,
     include_package_data=True,
     python_requires=">=3.6",
