@@ -19,7 +19,7 @@ class FeedbackResultsHandler(HubOAuthenticated, RequestHandler):
 
     @authenticated
     async def get(self, live_id):
-        self.log.info("Handing live feedback get request")
+        self.log.info("Handing live feedback results request")
 
         user_hash = core.get_user_hash(self.get_current_user())
 
@@ -38,7 +38,7 @@ class FeedbackResultsApiHandler(HubOAuthenticated, RequestHandler):
 
     @authenticated
     async def get(self, live_id):
-        self.log.info("Handing live feedback get request")
+        self.log.info("Handing live feedback results api request")
 
         user_hash = core.get_user_hash(self.get_current_user())
 

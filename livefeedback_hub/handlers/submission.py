@@ -52,7 +52,7 @@ class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
 
     @authenticated
     async def post(self):
-        self.log.info("Handing live feedback request")
+        self.log.info("Handing live feedback submission")
         nb = json.loads(self.request.body.decode("utf-8"))
 
         id, autograder_zip = self._get_autograding_zip(nb)
