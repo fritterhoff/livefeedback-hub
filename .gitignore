@@ -110,4 +110,5 @@ dmypy.json
 
 # OSX files
 .DS_Store
-livefeedback_hub/data.db
+data.db
+.vscode

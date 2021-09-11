@@ -2,7 +2,9 @@ FROM jupyterhub/jupyterhub
 
 # Install dockerspawner, oauth and live feedback
 RUN pip install --no-cache-dir \
-        oauthenticator dockerspawner https://codeload.github.com/fritterhoff/livefeedback-hub/zip/refs/heads/main
+        oauthenticator dockerspawner
+ADD . /tmp/extension
+RUN cd /tmp/extension && pip install .
 ARG DOCKER_VERSION=20.10.7
 RUN cd /tmp && \
     curl -sSL -O https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz && \

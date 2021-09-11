@@ -36,7 +36,7 @@ def delete_docker_image(service: JupyterService, task: AutograderZip):
     image = f"{utils.OTTER_DOCKER_IMAGE_TAG}:{m.hexdigest()}"
     service.log.info(f"Deleting docker image {image}")
     try:
-        docker.image.remove(image=image, force=True)
+        docker.image.remove(image, force=True)
     except NoSuchImage as e:
         service.log.warning(f"Image not found: {e}")
 
