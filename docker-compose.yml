@@ -1,0 +1,29 @@
+version: "3"
+
+services:
+  hub:
+    restart: always
+    build:
+      context: .
+    restart: always
+    image: jupyterhub
+    container_name: jupyterhub
+    volumes:
+      # Bind Docker socket on the host so we can connect to the daemon from within the container
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      # Bind Docker volume on host for JupyterHub database and cookie secrets
+      - "./jupyterhub:/srv/jupyterhub/"
+      # Bind tmp folder for docker in docker building and running of containers
+      - /tmp:/tmp
+    environment:
+      # All containers will join this network
+      DOCKER_NETWORK_NAME: jupyterhub
+    ports:
+      - "127.0.0.1:8000:8000"
+    command: >
+      jupyterhub -f /srv/jupyterhub/jupyterhub_config.py
+  
+networks:
+  default:
+    external:
+      name: jupyterhub

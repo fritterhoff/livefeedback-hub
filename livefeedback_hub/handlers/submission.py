@@ -6,7 +6,7 @@ import shutil
 import tempfile
 from concurrent.futures.thread import ThreadPoolExecutor
 from io import BytesIO
-from typing import Optional
+from typing import Optional, Tuple
 
 import pandas as pd
 import stdio_proxy
@@ -33,7 +33,7 @@ class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
             return match.group(1)
         return None
 
-    def _get_autograding_zip(self, nb) -> (Optional[str], Optional[bytes]):
+    def _get_autograding_zip(self, nb) -> Tuple[Optional[str], Optional[bytes]]:
         cells = [cell["source"] for cell in nb["cells"]]
         pattern = self._create_pattern()
         live_ids = [self._check_line(pattern, line) for item in cells for line in item.split("\n") if self._check_line(pattern, line)]
@@ -90,6 +90,7 @@ class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
             with stdio_proxy.redirect_stdout(stdout), stdio_proxy.redirect_stderr(stderr):
                 user_result = containers.grade_assignments(path, image, debug=True, verbose=True)
             self.add_or_update_results(user_hash, id, user_result)
+            self.log.info(f"Grading complete for {user_hash} and {id}")
         except Exception as e:
             self.log.exception(e)
         finally:

@@ -7,6 +7,7 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from hashlib import md5
 from io import BytesIO
 from typing import Optional
+import pkg_resources
 
 from python_on_whales import docker
 from python_on_whales.exceptions import NoSuchImage
@@ -53,6 +54,7 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
     fd_zip, path_zip = tempfile.mkstemp(suffix=".zip", dir=tmp_dir)
     cwd = os.getcwd()
     try:
+
         with os.fdopen(fd_zip, "wb") as tmp:
             tmp.write(zip_file["body"])
             tmp.flush()
@@ -60,11 +62,29 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
         os.chdir(tmp_dir)
         base = "ucbdsinfra/otter-grader"
         service.log.info(f"Building new docker image for {id}")
-        stdout = BytesIO()
-        stderr = BytesIO()
-        with stdio_proxy.redirect_stdout(stdout), stdio_proxy.redirect_stderr(stderr):
-            image = containers.build_image(os.path.basename(path_zip), base, containers.generate_hash(os.path.basename(path_zip)))
-        service.log.info(f"Building new docker image {image} for {id} completed")
+        image = utils.OTTER_DOCKER_IMAGE_TAG + ":" + containers.generate_hash(os.path.basename(path_zip))
+
+        if update and docker.image.exists(image):
+            service.log.info(f"Image for {id} exists ({image})")
+            with service.session() as session:
+                item: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=id).first()
+                item.ready = True
+                item.data = zip_file["body"]
+            return
+        dockerfile = pkg_resources.resource_filename("otter.grade", "Dockerfile")
+
+        if not docker.image.exists(image):
+            print(f"Building new image for {id} using {base} as base image")
+            stdout = BytesIO()
+            stderr = BytesIO()
+            with stdio_proxy.redirect_stdout(stdout), stdio_proxy.redirect_stderr(stderr):
+                docker.build(".", build_args={"ZIPPATH": path_zip, "BASE_IMAGE": base}, tags=[image], file=dockerfile, load=True)
+            service.log.info(f"Building new docker image {image} for {id} completed")
+
+    except Exception as e:
+        service.log.error(f"Error while building docker image for {id}: {e}")
+        raise
+
     finally:
         os.chdir(cwd)
         shutil.rmtree(tmp_dir)
@@ -73,6 +93,7 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
         if update:
             task: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=id).first()
             delete_docker_image(service, task)
+
         service.log.info(f"Marking task {id} as ready")
         item: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=id).first()
         item.ready = True

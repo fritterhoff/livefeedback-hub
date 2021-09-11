@@ -112,3 +112,9 @@ dmypy.json
 .DS_Store
 data.db
 .vscode
+
+
+# JupyterHub files
+**/jupyterhub.sqlite
+**/jupyterhub_cookie_secret
+**/jupyterhub-proxy.pid
