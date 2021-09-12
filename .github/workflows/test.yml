@@ -6,7 +6,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      PYTHON_UNBUFFERED: true
+      PYTHONUNBUFFERED: true
 
     steps:
       - uses: actions/checkout@v2
