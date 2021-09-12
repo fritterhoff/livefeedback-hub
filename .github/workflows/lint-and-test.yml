@@ -36,7 +36,7 @@ jobs:
           pip install -e .
       - name: Run python tests
         run: |
-          pytest -rA --cov=livefeedback_hub --cov-report=xml --cov-report=term
+          pytest -rA --cov=livefeedback_hub --cov-branch --cov-report=xml --cov-report=term
           
       - name: "Upload coverage to Codecov"
         uses: codecov/codecov-action@v2
