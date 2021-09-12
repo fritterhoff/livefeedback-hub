@@ -68,8 +68,9 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
             service.log.info(f"Image for {id} exists ({image})")
             with service.session() as session:
                 item: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=id).first()
+                if item is None:
+                    return
                 item.ready = True
-                item.data = zip_file["body"]
             return
         dockerfile = pkg_resources.resource_filename("otter.grade", "Dockerfile")
 
@@ -92,12 +93,10 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
     with service.session() as session:
         if update:
             task: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=id).first()
-            delete_docker_image(service, task)
-
-        service.log.info(f"Marking task {id} as ready")
-        item: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=id).first()
-        item.ready = True
-        item.data = zip_file["body"]
+            if task is not None:
+                delete_docker_image(service, task)
+                task.data = zip_file["body"]
+                task.ready = True
 
 
 class FeedbackManagementHandler(HubOAuthenticated, RequestHandler):
@@ -122,6 +121,7 @@ class FeedbackZipAddHandler(HubOAuthenticated, RequestHandler):
     @teacher_only
     async def get(self):
         task = AutograderZip()
+        task.description = ""
         await self.render("edit.html", task=task, edit=False, base=self.service.prefix)
 
     @teacher_only

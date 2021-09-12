@@ -2,8 +2,7 @@
 
 This package provides a service extension for `JupyterHub` to collect notebooks from `JupyterLab`, check them using predefined `Otter-Grader` checks and saves the results in a database. The results can be used for real time feedback during study courses and to evaluate the knowledge anonymously.
 
-
-## Requirements & Usage 
+## Requirements & Usage
 
 This tool makes use of the grading functionality of `Otter-Grader`. Therefore, access to a docker daemon is required. In case of hosting `JupyterHub` inside a docker container you need to pass the `docker.sock` to this container (e.g. using `-v /var/run/docker.sock:/var/run/docker.sock`) and `/tmp` because otter-grader and the tool himself creates plenty of temporary files during execution. An example Dockerfile is provided in this repository installing all required packages for a common configuration containing OAuth authentication, DockerSpawner and the Live Feedback extension.
 
