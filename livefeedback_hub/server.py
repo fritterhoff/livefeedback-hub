@@ -107,7 +107,7 @@ if __name__ == "__main__":
             Method for development! Mocks the user so running without
             :param get_current_user_mock: MagicMock object representing the get_current_user method. The return value gets set to a static defined user.
             """
-            get_current_user_mock.return_value = {"name": "admin"}
+            get_current_user_mock.return_value = {"name": "admin", 'groups': ['teacher']}
             main()
         development()
     else:
