@@ -2,10 +2,13 @@ import os
 from unittest.mock import MagicMock, call, patch
 
 import pytest
+import tornado.web
 from otter.grade import utils
 from python_on_whales.exceptions import NoSuchImage
 from tornado.httputil import HTTPFile
+from tornado.testing import AsyncHTTPTestCase
 
+from livefeedback_hub import core
 from livefeedback_hub.db import AutograderZip
 from livefeedback_hub.handlers import manage
 from livefeedback_hub.server import JupyterService
@@ -54,7 +57,7 @@ class TestManage:
         manage.build(service, "1", zip_file=zip, update=True)
         exists.assert_called_once_with(f"{utils.OTTER_DOCKER_IMAGE_TAG}:0cbc6611f5540bd0809a388dc95a615b")
         with service.session() as session:
-            assert session.query(AutograderZip).filter_by(id="1").first().ready == True
+            assert session.query(AutograderZip).filter_by(id="1").first().ready is True
 
     @patch("python_on_whales.docker.image.exists")
     @patch("python_on_whales.docker.build")
@@ -74,9 +77,54 @@ class TestManage:
 
         build.assert_called_once()
         args: call = build.call_args
-        assert args.kwargs["load"] == True
+        assert args.kwargs["load"] is True
         assert args.kwargs["tags"] == [f"{utils.OTTER_DOCKER_IMAGE_TAG}:0cbc6611f5540bd0809a388dc95a615b"]
 
         with service.session() as session:
-            assert session.query(AutograderZip).filter_by(id="1").first().ready == True
+            assert session.query(AutograderZip).filter_by(id="1").first().ready is True
             assert session.query(AutograderZip).filter_by(id="1").first().data == bytes("Test", "utf-8")
+
+
+class TestManageHandler(AsyncHTTPTestCase):
+    service = JupyterService()
+
+    def get_app(self):
+        return self.service.app
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    def test_load_logged_in(self, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "admin", 'groups': ['teacher']}
+        response = self.fetch("/")
+        assert response.code == 200
+
+        with patch.object(tornado.web.RequestHandler, 'render') as mock:
+            self.fetch("/")
+            mock.assert_called_once_with('overview.html', tasks=[], base='/')
+        zip = AutograderZip(id="1", description="Test", ready=False, data=bytes("Old", "utf-8"),
+                            owner=core.get_user_hash(get_current_user_mock.return_value))
+        zip2 = AutograderZip(id="2", description="Test 2", ready=False, data=bytes("Old", "utf-8"),
+                             owner=core.get_user_hash(get_current_user_mock.return_value))
+        zip3 = AutograderZip(id="3", description="Test 3", ready=False, data=bytes("Old", "utf-8"),
+                             owner=core.get_user_hash(get_current_user_mock.return_value))
+
+        with self.service.session() as session:
+            session.add(zip)
+            session.add(zip2)
+            session.add(zip3)
+
+        response = self.fetch("/")
+        assert response.code == 200
+
+        with patch.object(tornado.web.RequestHandler, 'render') as mock:
+            self.fetch("/")
+            mock.assert_called_once()
+            args = mock.call_args
+            assert len(args.kwargs["tasks"]) == 3
+            # Testing the content of the tasks does not work due to issues with sql sessions
+
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    def test_load_no_teacher(self, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "admin", 'groups': []}
+        response = self.fetch("/")
+        assert response.code == 403
