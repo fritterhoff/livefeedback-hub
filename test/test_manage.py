@@ -6,10 +6,9 @@ from python_on_whales.exceptions import NoSuchImage
 from livefeedback_hub.db import AutograderZip
 from livefeedback_hub.handlers import manage
 from livefeedback_hub.server import JupyterService
-from . import TestCase
 
 
-class TestManage(TestCase):
+class TestManage:
 
     @patch("python_on_whales.docker.image.remove")
     def test_delete_image(self, mock: MagicMock):
