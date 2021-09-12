@@ -21,4 +21,4 @@ jobs:
           pip install -e .
       - name: Run python tests
         run: |
-          pytest
+          pytest -rA
