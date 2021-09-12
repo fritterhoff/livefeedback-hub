@@ -1,4 +1,5 @@
 import os
+import uuid
 from unittest.mock import MagicMock, call, patch
 
 import pytest
@@ -9,11 +10,11 @@ from tornado.httputil import HTTPFile
 from tornado.testing import AsyncHTTPTestCase
 
 from livefeedback_hub import core
-from livefeedback_hub.db import AutograderZip
+from livefeedback_hub.db import AutograderZip, Result
 from livefeedback_hub.handlers import manage
 from livefeedback_hub.server import JupyterService
 
-os.environ["SERVICE_DB_URL"] = "sqlite://"
+os.environ["SERVICE_DB_URL"] = "sqlite:///:memory:"
 
 
 class TestManage:
@@ -91,6 +92,13 @@ class TestManageHandler(AsyncHTTPTestCase):
     def get_app(self):
         return self.service.app
 
+    def tearDown(self):
+        with self.service.session() as session:
+            session.query(AutograderZip).delete()
+            session.query(Result).delete()
+
+        super().tearDown()
+
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
     def test_load_logged_in(self, get_current_user_mock: MagicMock):
         get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
@@ -100,6 +108,7 @@ class TestManageHandler(AsyncHTTPTestCase):
         with patch.object(tornado.web.RequestHandler, "render") as mock:
             self.fetch("/")
             mock.assert_called_once_with("overview.html", tasks=[], base="/")
+
         zip = AutograderZip(id="1", description="Test", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
         zip2 = AutograderZip(id="2", description="Test 2", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
         zip3 = AutograderZip(id="3", description="Test 3", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
@@ -124,3 +133,38 @@ class TestManageHandler(AsyncHTTPTestCase):
         get_current_user_mock.return_value = {"name": "admin", "groups": []}
         response = self.fetch("/")
         assert response.code == 403
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    def test_edit_no_teacher(self, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "admin", "groups": []}
+        response = self.fetch(f"/manage/edit/{str(uuid.uuid4())}")
+        assert response.code == 403
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    def test_edit_no_task(self, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
+        response = self.fetch(f"/manage/edit/{str(uuid.uuid4())}")
+        assert response.code == 403
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    def test_edit_wrong_user(self, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
+        id = str(uuid.uuid4())
+        with self.service.session() as session:
+            zip = AutograderZip(id=id, description="Test", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash({"name": "user"}))
+            session.add(zip)
+
+        response = self.fetch(f"/manage/edit/{id}")
+        assert response.code == 403
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    def test_edit_success(self, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
+        id = str(uuid.uuid4())
+        with self.service.session() as session:
+            zip = AutograderZip(id=id, description="Test", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
+            session.add(zip)
+
+        response = self.fetch(f"/manage/edit/{id}")
+
+        assert response.code == 200
