@@ -53,50 +53,48 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
     tmp_dir = tempfile.mkdtemp()
     fd_zip, path_zip = tempfile.mkstemp(suffix=".zip", dir=tmp_dir)
     cwd = os.getcwd()
-    try:
-
-        with os.fdopen(fd_zip, "wb") as tmp:
-            tmp.write(zip_file["body"])
-            tmp.flush()
-
-        os.chdir(tmp_dir)
-        base = "ucbdsinfra/otter-grader"
-        service.log.info(f"Building new docker image for {id}")
-        image = utils.OTTER_DOCKER_IMAGE_TAG + ":" + containers.generate_hash(os.path.basename(path_zip))
-
-        if update and docker.image.exists(image):
-            service.log.info(f"Image for {id} exists ({image})")
-            with service.session() as session:
-                item: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=id).first()
-                if item is None:
-                    return
-                item.ready = True
-            return
-        dockerfile = pkg_resources.resource_filename("otter.grade", "Dockerfile")
-
-        if not docker.image.exists(image):
-            print(f"Building new image for {id} using {base} as base image")
-            stdout = BytesIO()
-            stderr = BytesIO()
-            with stdio_proxy.redirect_stdout(stdout), stdio_proxy.redirect_stderr(stderr):
-                docker.build(".", build_args={"ZIPPATH": path_zip, "BASE_IMAGE": base}, tags=[image], file=dockerfile, load=True)
-            service.log.info(f"Building new docker image {image} for {id} completed")
-
-    except Exception as e:
-        service.log.error(f"Error while building docker image for {id}: {e}")
-        raise
-
-    finally:
-        os.chdir(cwd)
-        shutil.rmtree(tmp_dir)
 
     with service.session() as session:
-        task: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=id).first()
-        if task is not None:
-            if update:
-                delete_docker_image(service, task)
-            task.data = zip_file["body"]
-            task.ready = True
+        item: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=id).first()
+        if item is None:
+            return
+        try:
+
+            with os.fdopen(fd_zip, "wb") as tmp:
+                tmp.write(zip_file["body"])
+                tmp.flush()
+
+            os.chdir(tmp_dir)
+            base = "ucbdsinfra/otter-grader"
+            service.log.info(f"Building new docker image for {id}")
+            image = utils.OTTER_DOCKER_IMAGE_TAG + ":" + containers.generate_hash(os.path.basename(path_zip))
+
+            if update and docker.image.exists(image):
+                service.log.info(f"Image for {id} exists ({image})")
+                item.ready = True
+                return
+            dockerfile = pkg_resources.resource_filename("otter.grade", "Dockerfile")
+
+            if not docker.image.exists(image):
+                print(f"Building new image for {id} using {base} as base image")
+                stdout = BytesIO()
+                stderr = BytesIO()
+                with stdio_proxy.redirect_stdout(stdout), stdio_proxy.redirect_stderr(stderr):
+                    docker.build(".", build_args={"ZIPPATH": path_zip, "BASE_IMAGE": base}, tags=[image], file=dockerfile, load=True)
+                service.log.info(f"Building new docker image {image} for {id} completed")
+
+        except Exception as e:
+            service.log.error(f"Error while building docker image for {id}: {e}")
+            raise
+
+        finally:
+            os.chdir(cwd)
+            shutil.rmtree(tmp_dir)
+
+        if update:
+            delete_docker_image(service, item)
+        item.data = zip_file["body"]
+        item.ready = True
 
 
 class FeedbackManagementHandler(HubOAuthenticated, RequestHandler):
