@@ -93,19 +93,16 @@ class TestManageHandler(AsyncHTTPTestCase):
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
     def test_load_logged_in(self, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "admin", 'groups': ['teacher']}
+        get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
         response = self.fetch("/")
         assert response.code == 200
 
-        with patch.object(tornado.web.RequestHandler, 'render') as mock:
+        with patch.object(tornado.web.RequestHandler, "render") as mock:
             self.fetch("/")
-            mock.assert_called_once_with('overview.html', tasks=[], base='/')
-        zip = AutograderZip(id="1", description="Test", ready=False, data=bytes("Old", "utf-8"),
-                            owner=core.get_user_hash(get_current_user_mock.return_value))
-        zip2 = AutograderZip(id="2", description="Test 2", ready=False, data=bytes("Old", "utf-8"),
-                             owner=core.get_user_hash(get_current_user_mock.return_value))
-        zip3 = AutograderZip(id="3", description="Test 3", ready=False, data=bytes("Old", "utf-8"),
-                             owner=core.get_user_hash(get_current_user_mock.return_value))
+            mock.assert_called_once_with("overview.html", tasks=[], base="/")
+        zip = AutograderZip(id="1", description="Test", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
+        zip2 = AutograderZip(id="2", description="Test 2", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
+        zip3 = AutograderZip(id="3", description="Test 3", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
 
         with self.service.session() as session:
             session.add(zip)
@@ -115,16 +112,15 @@ class TestManageHandler(AsyncHTTPTestCase):
         response = self.fetch("/")
         assert response.code == 200
 
-        with patch.object(tornado.web.RequestHandler, 'render') as mock:
+        with patch.object(tornado.web.RequestHandler, "render") as mock:
             self.fetch("/")
             mock.assert_called_once()
             args = mock.call_args
             assert len(args.kwargs["tasks"]) == 3
             # Testing the content of the tasks does not work due to issues with sql sessions
 
-
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
     def test_load_no_teacher(self, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "admin", 'groups': []}
+        get_current_user_mock.return_value = {"name": "admin", "groups": []}
         response = self.fetch("/")
         assert response.code == 403

@@ -20,6 +20,7 @@ class AutograderZip(Base):
     def __str__(self):
         return f"{self.id}: {self.description} ({self.owner})"
 
+
 class Result(Base):
     __tablename__ = "results"
 
