@@ -6,7 +6,7 @@ from otter.grade import utils
 from python_on_whales.exceptions import NoSuchImage
 from tornado.httputil import HTTPFile
 
-from livefeedback_hub.db import AutograderZip, Base
+from livefeedback_hub.db import AutograderZip
 from livefeedback_hub.handlers import manage
 from livefeedback_hub.server import JupyterService
 
