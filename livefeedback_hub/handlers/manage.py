@@ -91,12 +91,12 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
         shutil.rmtree(tmp_dir)
 
     with service.session() as session:
-        if update:
-            task: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=id).first()
-            if task is not None:
+        task: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=id).first()
+        if task is not None:
+            if update:
                 delete_docker_image(service, task)
-                task.data = zip_file["body"]
-                task.ready = True
+            task.data = zip_file["body"]
+            task.ready = True
 
 
 class FeedbackManagementHandler(HubOAuthenticated, RequestHandler):
