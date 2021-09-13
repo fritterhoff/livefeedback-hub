@@ -185,13 +185,13 @@ class TestManageHandler(AsyncHTTPTestCase):
 
         # set the Content-Type header
         headers = {"Content-Type": "multipart/form-data; boundary=%s" % boundary}
-
+        
         # create the body
 
         # opening boundary
         body = "--%s\r\n" % boundary
 
-        # data for field1
+        # data for description
         body += 'Content-Disposition: form-data; name="description"\r\n'
         body += "\r\n"  # blank line
         body += f"{description}\r\n"
@@ -199,12 +199,14 @@ class TestManageHandler(AsyncHTTPTestCase):
         # separator boundary
         body += "--%s\r\n" % boundary
 
-        # data for field2
-        body += 'Content-Disposition: form-data; name="zip"; filename="autograder.zip"\r\n'
-        body += "\r\n"  # blank line
-        # now read myfile.png and add that data to the body
-        body += "%s\r\n" % file
-
+        if file is not None:
+            # data for zip
+            body += 'Content-Disposition: form-data; name="zip"; filename="autograder.zip"\r\n'
+            body += "\r\n"  # blank line
+            body += "%s\r\n" % file
+        else:
+            # Simulate no file
+            body += 'Content-Disposition: form-data; name="zip"; filename=""\r\nContent-Type: application/octet-stream\r\n'
         # the closing boundary
         body += "--%s--\r\n" % boundary
         return (headers, body)
@@ -239,4 +241,20 @@ class TestManageHandler(AsyncHTTPTestCase):
         submit.assert_called_once()
         with self.service.session() as session:
             assert session.query(AutograderZip).filter_by(id=id).first().ready is False
+            assert session.query(AutograderZip).filter_by(id=id).first().description == "Hello"
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    @patch("livefeedback_hub.handlers.manage.executor.submit")
+    def test_update_grader_no_zip(self, submit: MagicMock, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
+        id = str(uuid.uuid4())
+        with self.service.session() as session:
+            zip = AutograderZip(id=id, description="Test", ready=True, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
+            session.add(zip)
+        headers, body = self.generate_request(None, "Hello")
+        response = self.fetch(f"/manage/edit/{id}", method="POST", headers=headers, body=body, follow_redirects=False)
+        assert response.code == 302
+        submit.assert_not_called()
+        with self.service.session() as session:
+            assert session.query(AutograderZip).filter_by(id=id).first().ready is True
             assert session.query(AutograderZip).filter_by(id=id).first().description == "Hello"
