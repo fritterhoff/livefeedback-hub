@@ -55,3 +55,5 @@ class TestSubmissionHandler(AsyncHTTPTestCase):
         assert response.code == 200
         time.sleep(2)
         grade.assert_called_once()
+        args = grade.call_args
+        assert args.args[1] == "otter-grade:c7268757fbabf48019f4984933539d8a"
