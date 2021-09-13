@@ -185,7 +185,7 @@ class TestManageHandler(AsyncHTTPTestCase):
 
         # set the Content-Type header
         headers = {"Content-Type": "multipart/form-data; boundary=%s" % boundary}
-        
+
         # create the body
 
         # opening boundary
