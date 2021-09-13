@@ -258,3 +258,21 @@ class TestManageHandler(AsyncHTTPTestCase):
         with self.service.session() as session:
             assert session.query(AutograderZip).filter_by(id=id).first().ready is True
             assert session.query(AutograderZip).filter_by(id=id).first().description == "Hello"
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    def test_add_grader_no_teacher(self, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "teacher", "groups": [""]}
+        response = self.fetch(f"/manage/add")
+        assert response.code == 403
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    def test_add_grader(self, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
+        response = self.fetch("/manage/add")
+        assert response.code == 200
+        with patch.object(tornado.web.RequestHandler, "render") as mock:
+            self.fetch("/manage/add")
+            mock.assert_called_once()
+            args = mock.call_args
+            task = args.kwargs["task"]
+            assert task.description == ""
