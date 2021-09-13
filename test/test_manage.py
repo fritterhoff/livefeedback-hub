@@ -17,6 +17,10 @@ from livefeedback_hub.server import JupyterService
 os.environ["SERVICE_DB_URL"] = "sqlite:///:memory:"
 
 
+def compareTasks(x: AutograderZip, y: AutograderZip):
+    return x.id == y.id and x.ready == y.ready and x.owner == y.owner and x.description == y.description
+
+
 class TestManage:
     @pytest.fixture()
     def service(self):
@@ -109,8 +113,8 @@ class TestManageHandler(AsyncHTTPTestCase):
             self.fetch("/")
             mock.assert_called_once_with("overview.html", tasks=[], base="/")
 
-        zip = AutograderZip(id="1", description="Test", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
-        zip2 = AutograderZip(id="2", description="Test 2", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
+        zip = AutograderZip(id="1", description="Test 1", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
+        zip2 = AutograderZip(id="2", description="Test 2", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash({"name": "user"}))
         zip3 = AutograderZip(id="3", description="Test 3", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
 
         with self.service.session() as session:
@@ -125,8 +129,14 @@ class TestManageHandler(AsyncHTTPTestCase):
             self.fetch("/")
             mock.assert_called_once()
             args = mock.call_args
-            assert len(args.kwargs["tasks"]) == 3
-            # Testing the content of the tasks does not work due to issues with sql sessions
+            assert len(args.kwargs["tasks"]) == 2
+            with self.service.session() as session:
+                x = session.merge(args.kwargs["tasks"][0])
+                y = session.merge(zip)
+                assert compareTasks(x, y) is True
+                x = session.merge(args.kwargs["tasks"][1])
+                y = session.merge(zip3)
+                assert compareTasks(x, y) is True
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
     def test_load_no_teacher(self, get_current_user_mock: MagicMock):
