@@ -295,3 +295,31 @@ class TestManageHandler(AsyncHTTPTestCase):
         with self.service.session() as session:
             assert session.query(AutograderZip).first().ready is False
             assert session.query(AutograderZip).first().description == "Hello"
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    def test_delete_grader_no_teacher(self, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "teacher", "groups": [""]}
+        id = str(uuid.uuid4())
+        response = self.fetch(f"/manage/delete/{id}")
+        assert response.code == 403
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    def test_delete_grader_no_task(self, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
+        id = str(uuid.uuid4())
+        response = self.fetch(f"/manage/delete/{id}")
+        assert response.code == 403
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    @patch("livefeedback_hub.handlers.manage.delete_docker_image")
+    def test_delete(self, delete: MagicMock, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
+        id = str(uuid.uuid4())
+        with self.service.session() as session:
+            zip = AutograderZip(id=id, description="Test", ready=True, data=bytes("Old", "utf-8"),
+                                owner=core.get_user_hash(get_current_user_mock.return_value))
+            session.add(zip)
+
+        response = self.fetch(f"/manage/delete/{id}", follow_redirects=False)
+        assert response.code == 302
+        delete.assert_called_once()
