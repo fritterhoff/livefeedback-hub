@@ -22,7 +22,7 @@ Neuer Eintrag
     </div>
     <div  class="mb-3">
         <label for="zip" class="form-label">Zip-Datei</label>
-        <input type="file" class="form-control" accept=".zip" name="zip" id="zip" required />
+        <input type="file" class="form-control" accept=".zip" name="zip" id="zip" {% if not edit %} required {% end %} />
     </div>
     <input class="btn btn-primary" type="submit" />
 </form>

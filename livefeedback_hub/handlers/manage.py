@@ -76,7 +76,7 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
             dockerfile = pkg_resources.resource_filename("otter.grade", "Dockerfile")
 
             if not docker.image.exists(image):
-                print(f"Building new image for {id} using {base} as base image")
+                service.log.info(f"Building new image for {id} using {base} as base image")
                 stdout = BytesIO()
                 stderr = BytesIO()
                 with stdio_proxy.redirect_stdout(stdout), stdio_proxy.redirect_stderr(stderr):

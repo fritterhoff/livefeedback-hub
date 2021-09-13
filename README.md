@@ -1,5 +1,8 @@
 # Live Feedback Extension for JupyterHub
 
+[![Flake8 and Testing](https://github.com/fritterhoff/livefeedback-hub/actions/workflows/lint-and-test.yml/badge.svg)](https://github.com/fritterhoff/livefeedback-hub/actions/workflows/lint-and-test.yml)
+[![codecov](https://codecov.io/gh/fritterhoff/livefeedback-hub/branch/main/graph/badge.svg?token=0Z8YPSJF5R)](https://codecov.io/gh/fritterhoff/livefeedback-hub)
+
 This package provides a service extension for `JupyterHub` to collect notebooks from `JupyterLab`, check them using predefined `Otter-Grader` checks and saves the results in a database. The results can be used for real time feedback during study courses and to evaluate the knowledge anonymously.
 
 ## Requirements & Usage
