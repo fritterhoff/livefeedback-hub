@@ -113,9 +113,12 @@ class TestManageHandler(AsyncHTTPTestCase):
             self.fetch("/")
             mock.assert_called_once_with("overview.html", tasks=[], base="/")
 
-        zip = AutograderZip(id="1", description="Test 1", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
-        zip2 = AutograderZip(id="2", description="Test 2", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash({"name": "user"}))
-        zip3 = AutograderZip(id="3", description="Test 3", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
+        zip = AutograderZip(id="1", description="Test 1", ready=False, data=bytes("Old", "utf-8"),
+                            owner=core.get_user_hash(get_current_user_mock.return_value))
+        zip2 = AutograderZip(id="2", description="Test 2", ready=False, data=bytes("Old", "utf-8"),
+                             owner=core.get_user_hash({"name": "user"}))
+        zip3 = AutograderZip(id="3", description="Test 3", ready=False, data=bytes("Old", "utf-8"),
+                             owner=core.get_user_hash(get_current_user_mock.return_value))
 
         with self.service.session() as session:
             session.add(zip)
@@ -161,7 +164,8 @@ class TestManageHandler(AsyncHTTPTestCase):
         get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
         id = str(uuid.uuid4())
         with self.service.session() as session:
-            zip = AutograderZip(id=id, description="Test", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash({"name": "user"}))
+            zip = AutograderZip(id=id, description="Test", ready=False, data=bytes("Old", "utf-8"),
+                                owner=core.get_user_hash({"name": "user"}))
             session.add(zip)
 
         response = self.fetch(f"/manage/edit/{id}")
@@ -172,7 +176,8 @@ class TestManageHandler(AsyncHTTPTestCase):
         get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
         id = str(uuid.uuid4())
         with self.service.session() as session:
-            zip = AutograderZip(id=id, description="Test", ready=False, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
+            zip = AutograderZip(id=id, description="Test", ready=False, data=bytes("Old", "utf-8"),
+                                owner=core.get_user_hash(get_current_user_mock.return_value))
             session.add(zip)
 
         response = self.fetch(f"/manage/edit/{id}")
@@ -233,7 +238,8 @@ class TestManageHandler(AsyncHTTPTestCase):
         get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
         id = str(uuid.uuid4())
         with self.service.session() as session:
-            zip = AutograderZip(id=id, description="Test", ready=True, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
+            zip = AutograderZip(id=id, description="Test", ready=True, data=bytes("Old", "utf-8"),
+                                owner=core.get_user_hash(get_current_user_mock.return_value))
             session.add(zip)
         headers, body = self.generate_request(bytes("Test", "utf-8"), "Hello")
         response = self.fetch(f"/manage/edit/{id}", method="POST", headers=headers, body=body, follow_redirects=False)
@@ -249,7 +255,8 @@ class TestManageHandler(AsyncHTTPTestCase):
         get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
         id = str(uuid.uuid4())
         with self.service.session() as session:
-            zip = AutograderZip(id=id, description="Test", ready=True, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
+            zip = AutograderZip(id=id, description="Test", ready=True, data=bytes("Old", "utf-8"),
+                                owner=core.get_user_hash(get_current_user_mock.return_value))
             session.add(zip)
         headers, body = self.generate_request(None, "Hello")
         response = self.fetch(f"/manage/edit/{id}", method="POST", headers=headers, body=body, follow_redirects=False)
@@ -262,7 +269,7 @@ class TestManageHandler(AsyncHTTPTestCase):
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
     def test_add_grader_no_teacher(self, get_current_user_mock: MagicMock):
         get_current_user_mock.return_value = {"name": "teacher", "groups": [""]}
-        response = self.fetch(f"/manage/add")
+        response = self.fetch("/manage/add")
         assert response.code == 403
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
@@ -276,3 +283,15 @@ class TestManageHandler(AsyncHTTPTestCase):
             args = mock.call_args
             task = args.kwargs["task"]
             assert task.description == ""
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    @patch("livefeedback_hub.handlers.manage.executor.submit")
+    def test_add_grader(self, submit: MagicMock, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
+        headers, body = self.generate_request(bytes("Test", "utf-8"), "Hello")
+        response = self.fetch("/manage/add", method="POST", headers=headers, body=body, follow_redirects=False)
+        assert response.code == 302
+        submit.assert_called_once()
+        with self.service.session() as session:
+            assert session.query(AutograderZip).first().ready is False
+            assert session.query(AutograderZip).first().description == "Hello"
