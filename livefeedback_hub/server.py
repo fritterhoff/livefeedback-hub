@@ -63,6 +63,9 @@ class JupyterService(Application):
         logging.basicConfig(level=logging.INFO)
         self._init_db()
         self.log: logging.Logger = logging.getLogger("tornado.application")
+        xsrf_cookies = True
+        if 'xsrf_cookies' in kwargs:
+            xsrf_cookies = kwargs['xsrf_cookies']
         self.app = TornadoApplication(
             [
                 (self.prefix, FeedbackManagementHandler, {"service": self}),
@@ -81,7 +84,7 @@ class JupyterService(Application):
             static_path=os.path.join(os.path.dirname(__file__), "static"),
             static_url_prefix=url_path_join(self.prefix, "static/"),
             cookie_secret=os.urandom(32),
-            xsrf_cookies=True,
+            xsrf_cookies=xsrf_cookies,
         )
 
     def start(self):

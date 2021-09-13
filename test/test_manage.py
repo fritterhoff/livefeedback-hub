@@ -91,7 +91,7 @@ class TestManage:
 
 
 class TestManageHandler(AsyncHTTPTestCase):
-    service = JupyterService()
+    service = JupyterService(xsrf_cookies=False)
 
     def get_app(self):
         return self.service.app
@@ -178,3 +178,65 @@ class TestManageHandler(AsyncHTTPTestCase):
         response = self.fetch(f"/manage/edit/{id}")
 
         assert response.code == 200
+
+    def generate_request(self, file, description):
+        # create a boundary
+        boundary = "SomeRandomBoundary"
+
+        # set the Content-Type header
+        headers = {"Content-Type": "multipart/form-data; boundary=%s" % boundary}
+
+        # create the body
+
+        # opening boundary
+        body = "--%s\r\n" % boundary
+
+        # data for field1
+        body += 'Content-Disposition: form-data; name="description"\r\n'
+        body += "\r\n"  # blank line
+        body += f"{description}\r\n"
+
+        # separator boundary
+        body += "--%s\r\n" % boundary
+
+        # data for field2
+        body += 'Content-Disposition: form-data; name="zip"; filename="autograder.zip"\r\n'
+        body += "\r\n"  # blank line
+        # now read myfile.png and add that data to the body
+        body += "%s\r\n" % file
+
+        # the closing boundary
+        body += "--%s--\r\n" % boundary
+        return (headers, body)
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    def test_update_grader_not_found(self, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
+        id = str(uuid.uuid4())
+        headers, body = self.generate_request(bytes("Test", "utf-8"), "Hello")
+        response = self.fetch(f"/manage/edit/{id}", method="POST", headers=headers, body=body)
+        assert response.code == 403
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    def test_update_grader_no_teacher(self, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "teacher", "groups": [""]}
+        id = str(uuid.uuid4())
+        headers, body = self.generate_request(bytes("Test", "utf-8"), "Hello")
+        response = self.fetch(f"/manage/edit/{id}", method="POST", headers=headers, body=body)
+        assert response.code == 403
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    @patch("livefeedback_hub.handlers.manage.executor.submit")
+    def test_update_grader(self, submit: MagicMock, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
+        id = str(uuid.uuid4())
+        with self.service.session() as session:
+            zip = AutograderZip(id=id, description="Test", ready=True, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
+            session.add(zip)
+        headers, body = self.generate_request(bytes("Test", "utf-8"), "Hello")
+        response = self.fetch(f"/manage/edit/{id}", method="POST", headers=headers, body=body, follow_redirects=False)
+        assert response.code == 302
+        submit.assert_called_once()
+        with self.service.session() as session:
+            assert session.query(AutograderZip).filter_by(id=id).first().ready is False
+            assert session.query(AutograderZip).filter_by(id=id).first().description == "Hello"
