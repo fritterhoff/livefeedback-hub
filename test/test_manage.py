@@ -286,7 +286,7 @@ class TestManageHandler(AsyncHTTPTestCase):
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
     @patch("livefeedback_hub.handlers.manage.executor.submit")
-    def test_add_grader(self, submit: MagicMock, get_current_user_mock: MagicMock):
+    def test_add_grader_post(self, submit: MagicMock, get_current_user_mock: MagicMock):
         get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
         headers, body = self.generate_request(bytes("Test", "utf-8"), "Hello")
         response = self.fetch("/manage/add", method="POST", headers=headers, body=body, follow_redirects=False)
