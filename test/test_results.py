@@ -34,6 +34,13 @@ class TestResultHandler(AsyncHTTPTestCase):
         response = self.fetch(f"/api/results/{id}")
         assert response.code == 204
 
+        with self.service.session() as session:
+            result = Result(assignment=id, data="q1,q2,q3,file\n1.0,1.0,1.0,tmp7_tbcley.ipynb", user="test")
+            session.add(result)
+        response = self.fetch(f"/api/results/{id}")
+        assert response.code == 200
+        assert response.body == b'{"index":{"0.0":1.0,"1.0":null},"q1":{"0.0":null,"1.0":1.0},"q2":{"0.0":null,"1.0":1.0},"q3":{"0.0":null,"1.0":1.0}}'
+
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
     def test_load_wrong_user(self, get_current_user_mock: MagicMock):
         get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
