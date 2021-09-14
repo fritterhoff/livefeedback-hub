@@ -1,0 +1,48 @@
+import uuid
+from unittest.mock import MagicMock, patch
+
+from tornado.testing import AsyncHTTPTestCase
+
+from livefeedback_hub import core
+from livefeedback_hub.db import AutograderZip, Result
+from livefeedback_hub.server import JupyterService
+
+
+class TestResultHandler(AsyncHTTPTestCase):
+    service = JupyterService(xsrf_cookies=False)
+
+    def get_app(self):
+        return self.service.app
+
+    def tearDown(self):
+        with self.service.session() as session:
+            session.query(AutograderZip).delete()
+            session.query(Result).delete()
+
+        super().tearDown()
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    def test_load_logged_in(self, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
+        id = str(uuid.uuid4())
+        with self.service.session() as session:
+            zip = AutograderZip(id=id, description="Test", ready=False, data=bytes("Old", "utf-8"),
+                                owner=core.get_user_hash(get_current_user_mock.return_value))
+            session.add(zip)
+        response = self.fetch(f"/results/{id}")
+        assert response.code == 200
+        response = self.fetch(f"/api/results/{id}")
+        assert response.code == 204
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    def test_load_wrong_user(self, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
+        id = str(uuid.uuid4())
+        with self.service.session() as session:
+            zip = AutograderZip(id=id, description="Test", ready=False, data=bytes("Old", "utf-8"),
+                                owner=core.get_user_hash({"name": "user"}))
+            session.add(zip)
+        response = self.fetch(f"/results/{id}")
+        assert response.code == 403
+        response = self.fetch(f"/api/results/{id}")
+        assert response.code == 403
