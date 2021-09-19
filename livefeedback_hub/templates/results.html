@@ -8,23 +8,24 @@
 <script>
 
     var setUp = false;
-
+    const charts = new Map();
 
 
     function handleResults(data) {
+        content = "";
         if (!setUp) {
-            setUp = true;
-            content = "";
             for (const [key, value] of Object.entries(data)) {
                 if (key == "index")
                     continue
                 content += `<div class="result"><h2>${key}</h2><div class="chart"><canvas  width="400" height="100" role="img" id="${key}"></canvas></div></div>`;
             }
             document.getElementById("results").innerHTML = content;
-            for (const [key, value] of Object.entries(data)) {
-                if (key == "index")
-                    continue
-                let cleaned = Object.fromEntries(Object.entries(data[key]).filter(([_, v]) => v != null));
+        }
+        for (const [key, value] of Object.entries(data)) {
+            if (key == "index")
+                continue
+            let cleaned = Object.fromEntries(Object.entries(data[key]).filter(([_, v]) => v != null));
+            if (!setUp) {
                 var chart = new Chart(document.getElementById(key), {
                     type: 'bar',
                     data: {
@@ -32,15 +33,17 @@
                         datasets: [{
                             label: "Vergebene Punkte",
                             data: Object.values(cleaned),
-                            
                         }]
                     },
-
                 });
+                charts.set(key, chart);
+            } else {
+                charts.get(key).data.labels = Object.keys(cleaned);
+                charts.get(key).data.datasets[0].data = Object.values(cleaned);
+                charts.get(key).update();
             }
         }
-
-
+        setUp = true;
     }
 
 
