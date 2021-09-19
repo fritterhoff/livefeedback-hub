@@ -17,7 +17,7 @@
             for (const [key, value] of Object.entries(data)) {
                 if (key == "index")
                     continue
-                content += `<div class="result"><h2>${key}</h2><div class="chart"><canvas  width="400" height="100" role="img" id="${key}"></canvas></div></div>`;
+                content += `<div class="result"><h2>Aufgabe ${key}:</h2><div class="chart"><canvas  width="400" height="100" role="img" id="${key}"></canvas></div></div>`;
             }
             document.getElementById("results").innerHTML = content;
         }
@@ -33,9 +33,24 @@
                         datasets: [{
                             label: "Vergebene Punkte",
                             data: Object.values(cleaned),
+                            backgroundColor: "#ffc180"
                         }]
                     },
+                    options: {
+                        scales: {
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Anzahl Studierende'
+                                },
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            }
+                        }
+                    }
                 });
+                console.log(chart)
                 charts.set(key, chart);
             } else {
                 charts.get(key).data.labels = Object.keys(cleaned);
