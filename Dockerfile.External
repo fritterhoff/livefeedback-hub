@@ -1,19 +1,11 @@
-FROM alpine as download
-ARG DOCKER_VERSION=20.10.7
-RUN cd /tmp && \
-    apk add curl && \
-    curl -sSL -O https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz && \
-    tar zxf docker-${DOCKER_VERSION}.tgz && \
-    mv ./docker/docker /usr/local/bin && \
-    chmod +x /usr/local/bin/docker && rm -rf /tmp/* 
-
-FROM python:3-slim
+FROM docker:dind
 
 # Install dockerspawner, oauth and live feedback
 COPY --from=docker/buildx-bin /buildx /usr/libexec/docker/cli-plugins/docker-buildx
-COPY --from=download /usr/local/bin/docker /usr/local/bin/docker
 COPY requirements.txt /tmp/extension/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/extension/requirements.txt
+RUN apk add --no-cache --virtual .build g++ python3-dev && apk add --no-cache py3-pip py3-matplotlib py3-numpy py3-pandas py3-cryptography && \
+    pip install --no-cache-dir -r /tmp/extension/requirements.txt && \
+    apk del .build
 COPY . /tmp/extension
 RUN cd /tmp/extension && pip install --no-cache-dir .
 
