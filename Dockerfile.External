@@ -1,12 +1,26 @@
-FROM docker:dind
+FROM alpine as download
+ARG DOCKER_VERSION=20.10.7
+RUN cd /tmp && \
+    apk add curl && \
+    curl -sSL -O https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz && \
+    tar zxf docker-${DOCKER_VERSION}.tgz && \
+    mv ./docker/docker /usr/local/bin && \
+    chmod +x /usr/local/bin/docker && rm -rf /tmp/* 
 
-# Install dockerspawner, oauth and live feedback
+FROM python:3-slim
+
 COPY --from=docker/buildx-bin /buildx /usr/libexec/docker/cli-plugins/docker-buildx
+COPY --from=download /usr/local/bin/docker /usr/local/bin/docker
+ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE 1
 COPY requirements.txt /tmp/extension/requirements.txt
-RUN apk add --no-cache --virtual .build g++ python3-dev && apk add --no-cache py3-pip py3-matplotlib py3-numpy py3-pandas py3-cryptography && \
-    pip install --no-cache-dir -r /tmp/extension/requirements.txt && \
-    apk del .build
+RUN pip install pip-autoremove && pip install --no-cache-dir -r /tmp/extension/requirements.txt && \
+    pip-autoremove -y gspread google-auth-oauthlib google-api-python-client && \
+    find / -type d -name __pycache__ -exec rm -r {} \+ && \
+    find / -type d -wholename "*/pandas/tests" -exec rm -r {} \+ && \
+    find / -type d -wholename "*/numpy/core/tests" -exec rm -r {} \+ 
 COPY . /tmp/extension
-RUN cd /tmp/extension && pip install --no-cache-dir .
+RUN cd /tmp/extension && pip install --no-cache-dir . && \
+    pip-autoremove -y gspread google-auth-oauthlib google-api-python-client
 
 CMD ["livefeedback-hub"]
