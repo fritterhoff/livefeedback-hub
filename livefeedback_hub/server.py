@@ -1,8 +1,6 @@
 import logging
 import os
 import pathlib
-
-
 from urllib.parse import urlparse
 
 import sqlalchemy.orm
@@ -14,7 +12,7 @@ from sqlalchemy.util.compat import contextmanager
 from tornado.httpserver import HTTPServer
 from tornado.ioloop import IOLoop
 from tornado.web import Application as TornadoApplication
-from traitlets import default, Unicode
+from traitlets import Unicode, default
 from traitlets.config.application import Application
 
 from livefeedback_hub.db import Base, GUID_REGEX
@@ -96,8 +94,8 @@ class JupyterService(Application):
         IOLoop.current().start()
 
 
-def main():
-    service = JupyterService()
+def main(**kwargs):
+    service = JupyterService(**kwargs)
     service.start()
 
 
@@ -112,7 +110,8 @@ if __name__ == "__main__":
             :param get_current_user_mock: MagicMock object representing the get_current_user method. The return value gets set to a static defined user.
             """
             get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
-            main()
+
+            main(xsrf_cookies=False)
 
         development()
     else:

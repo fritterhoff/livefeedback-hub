@@ -1,4 +1,3 @@
-import os
 import time
 from unittest.mock import MagicMock, patch
 
@@ -6,11 +5,9 @@ import pandas as pd
 from tornado.testing import AsyncHTTPTestCase
 
 from livefeedback_hub import core
-from livefeedback_hub.db import AutograderZip, Result
+from livefeedback_hub.db import AutograderZip, Result, State
 from livefeedback_hub.handlers import submission
 from livefeedback_hub.server import JupyterService
-
-os.environ["SERVICE_DB_URL"] = "sqlite:///:memory:"
 
 notebook = '{ "cells": [ { "cell_type": "code", "metadata": {}, "source": "# LIVE: 333e2069-612e-4e0c-a4ac-e6ec1eaa44f0" } ], "metadata": { "kernelspec": { "display_name": "Python 3", "language": "python", "name": "python3" }, "language_info": { "codemirror_mode": { "name": "ipython", "version": 3 }, "file_extension": ".py", "mimetype": "text/x-python", "name": "python", "nbconvert_exporter": "python", "pygments_lexer": "ipython3", "version": "3.6.5" }, "varInspector": { "cols": { "lenName": 16, "lenType": 16, "lenVar": 40 }, "kernels_config": { "python": { "delete_cmd_postfix": "", "delete_cmd_prefix": "del ", "library": "var_list.py", "varRefreshCmd": "print(var_dic_list())" }, "r": { "delete_cmd_postfix": ") ", "delete_cmd_prefix": "rm(", "library": "var_list.r", "varRefreshCmd": "cat(var_dic_list()) " } }, "types_to_exclude": [ "module", "function", "builtin_function_or_method", "instance", "_Feature" ], "window_display": false } }, "nbformat": 4, "nbformat_minor": 4}'
 notebook_without_id = '{ "cells": [ { "cell_type": "code", "metadata": {}, "source": "" } ], "metadata": { "kernelspec": { "display_name": "Python 3", "language": "python", "name": "python3" }, "language_info": { "codemirror_mode": { "name": "ipython", "version": 3 }, "file_extension": ".py", "mimetype": "text/x-python", "name": "python", "nbconvert_exporter": "python", "pygments_lexer": "ipython3", "version": "3.6.5" }, "varInspector": { "cols": { "lenName": 16, "lenType": 16, "lenVar": 40 }, "kernels_config": { "python": { "delete_cmd_postfix": "", "delete_cmd_prefix": "del ", "library": "var_list.py", "varRefreshCmd": "print(var_dic_list())" }, "r": { "delete_cmd_postfix": ") ", "delete_cmd_prefix": "rm(", "library": "var_list.r", "varRefreshCmd": "cat(var_dic_list()) " } }, "types_to_exclude": [ "module", "function", "builtin_function_or_method", "instance", "_Feature" ], "window_display": false } }, "nbformat": 4, "nbformat_minor": 4}'
@@ -89,7 +86,7 @@ class TestSubmissionHandler(AsyncHTTPTestCase):
         grade.side_effect = Exception()
         self.service.log.exception = MagicMock()
         with self.service.session() as session:
-            zip = AutograderZip(id="333e2069-612e-4e0c-a4ac-e6ec1eaa44f0", description="Test", ready=True,
+            zip = AutograderZip(id="333e2069-612e-4e0c-a4ac-e6ec1eaa44f0", description="Test", state=State.ready,
                                 data=bytes("Old", "utf-8"),
                                 owner=core.get_user_hash(get_current_user_mock.return_value))
             session.add(zip)
@@ -109,7 +106,7 @@ class TestSubmissionHandler(AsyncHTTPTestCase):
         grade.return_value = pd.DataFrame()
         self.service.log.exception = MagicMock()
         with self.service.session() as session:
-            zip = AutograderZip(id="333e2069-612e-4e0c-a4ac-e6ec1eaa44f0", description="Test", ready=True,
+            zip = AutograderZip(id="333e2069-612e-4e0c-a4ac-e6ec1eaa44f0", description="Test", state=State.ready,
                                 data=bytes("Old", "utf-8"),
                                 owner=core.get_user_hash(get_current_user_mock.return_value))
             session.add(zip)

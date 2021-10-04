@@ -1,6 +1,7 @@
-import os
+import io
 import uuid
-from unittest.mock import MagicMock, call, patch
+import zipfile
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 import tornado.web
@@ -10,15 +11,13 @@ from tornado.httputil import HTTPFile
 from tornado.testing import AsyncHTTPTestCase
 
 from livefeedback_hub import core
-from livefeedback_hub.db import AutograderZip, Result
+from livefeedback_hub.db import AutograderZip, Result, State
 from livefeedback_hub.handlers import manage
 from livefeedback_hub.server import JupyterService
 
-os.environ["SERVICE_DB_URL"] = "sqlite:///:memory:"
-
 
 def compareTasks(x: AutograderZip, y: AutograderZip):
-    return x.id == y.id and x.ready == y.ready and x.owner == y.owner and x.description == y.description
+    return x.id == y.id and x.state == y.state and x.owner == y.owner and x.description == y.description
 
 
 class TestManage:
@@ -32,7 +31,7 @@ class TestManage:
         zip = AutograderZip()
         zip.data = bytes("Test", "utf-8")
         mock.return_value = None
-        manage.delete_docker_image(service, zip)
+        core.delete_docker_image(service, zip)
         mock.assert_called_once_with(f"{utils.OTTER_DOCKER_IMAGE_TAG}:0cbc6611f5540bd0809a388dc95a615b", force=True)
 
     @patch("python_on_whales.docker.image.remove")
@@ -41,7 +40,7 @@ class TestManage:
         zip.data = bytes("Test", "utf-8")
         remove.side_effect = NoSuchImage([], 0)
         service.log.warning = MagicMock()
-        manage.delete_docker_image(service, zip)
+        core.delete_docker_image(service, zip)
         service.log.warning.assert_called_once()
 
     @patch("python_on_whales.docker.image.exists")
@@ -58,36 +57,62 @@ class TestManage:
         zip["body"] = bytes("Test", "utf-8")
         exists.return_value = True
         with service.session() as session:
-            session.add(AutograderZip(id="1", ready=False))
+            session.add(AutograderZip(id="1", state=State.building))
         manage.build(service, "1", zip_file=zip, update=True)
         exists.assert_called_once_with(f"{utils.OTTER_DOCKER_IMAGE_TAG}:0cbc6611f5540bd0809a388dc95a615b")
         with service.session() as session:
-            assert session.query(AutograderZip).filter_by(id="1").first().ready is True
+            assert session.query(AutograderZip).filter_by(id="1").first().state == State.ready
 
     @patch("python_on_whales.docker.image.exists")
     @patch("python_on_whales.docker.build")
     @patch("python_on_whales.docker.image.remove")
     def test_build_update(self, delete: MagicMock, build: MagicMock, exists: MagicMock, service):
         zip = HTTPFile()
-        zip["body"] = bytes("Test", "utf-8")
+        zip_bytes = io.BytesIO()
+        with zipfile.ZipFile(zip_bytes, "w") as zip_ref:
+            zip_ref.writestr("content", "Hello")
+        zip["body"] = zip_bytes.getvalue()
         exists.return_value = False
         with service.session() as session:
-            session.add(AutograderZip(id="1", ready=False, data=bytes("Old", "utf-8")))
+            session.add(AutograderZip(id="1", state=State.building, data=bytes("Old", "utf-8")))
 
         manage.build(service, "1", zip_file=zip, update=True)
 
-        exists.assert_called_with(f"{utils.OTTER_DOCKER_IMAGE_TAG}:0cbc6611f5540bd0809a388dc95a615b")
+        exists.assert_called_with(f"{utils.OTTER_DOCKER_IMAGE_TAG}:{core.calcuate_zip_hash(zip_bytes.getvalue())}")
 
         delete.assert_called_once_with(f"{utils.OTTER_DOCKER_IMAGE_TAG}:c7268757fbabf48019f4984933539d8a", force=True)
 
         build.assert_called_once()
         args: call = build.call_args
         assert args.kwargs["load"] is True
-        assert args.kwargs["tags"] == [f"{utils.OTTER_DOCKER_IMAGE_TAG}:0cbc6611f5540bd0809a388dc95a615b"]
+        assert args.kwargs["tags"] == [f"{utils.OTTER_DOCKER_IMAGE_TAG}:{core.calcuate_zip_hash(zip_bytes.getvalue())}"]
 
         with service.session() as session:
-            assert session.query(AutograderZip).filter_by(id="1").first().ready is True
-            assert session.query(AutograderZip).filter_by(id="1").first().data == bytes("Test", "utf-8")
+            assert session.query(AutograderZip).filter_by(id="1").first().state == State.ready
+            assert session.query(AutograderZip).filter_by(id="1").first().data == zip_bytes.getvalue()
+
+    @patch("python_on_whales.docker.image.exists")
+    @patch("python_on_whales.docker.build")
+    @patch("python_on_whales.docker.image.remove")
+    def test_build_update_fails(self, delete: MagicMock, build: MagicMock, exists: MagicMock, service):
+        zip = HTTPFile()
+        zip["body"] = bytes("Test", "utf-8")
+        exists.return_value = False
+        with service.session() as session:
+            session.add(AutograderZip(id="1", state=State.building, data=bytes("Old", "utf-8")))
+        build.side_effect = Exception()
+        try:
+            manage.build(service, "1", zip_file=zip, update=True)
+        except Exception as e:
+            assert e is not None
+
+        exists.assert_called_with(f"{utils.OTTER_DOCKER_IMAGE_TAG}:0cbc6611f5540bd0809a388dc95a615b")
+
+        delete.assert_not_called()
+
+        with service.session() as session:
+            assert session.query(AutograderZip).filter_by(id="1").first().state == State.error
+            assert session.query(AutograderZip).filter_by(id="1").first().data == bytes("Old", "utf-8")
 
 
 class TestManageHandler(AsyncHTTPTestCase):
@@ -109,16 +134,13 @@ class TestManageHandler(AsyncHTTPTestCase):
         response = self.fetch("/")
         assert response.code == 200
 
-        with patch.object(tornado.web.RequestHandler, "render") as mock:
+        with patch.object(tornado.web.RequestHandler, "render", new_callable=AsyncMock) as mock:
             self.fetch("/")
             mock.assert_called_once_with("overview.html", tasks=[], base="/")
 
-        zip = AutograderZip(id="1", description="Test 1", ready=False, data=bytes("Old", "utf-8"),
-                            owner=core.get_user_hash(get_current_user_mock.return_value))
-        zip2 = AutograderZip(id="2", description="Test 2", ready=False, data=bytes("Old", "utf-8"),
-                             owner=core.get_user_hash({"name": "user"}))
-        zip3 = AutograderZip(id="3", description="Test 3", ready=False, data=bytes("Old", "utf-8"),
-                             owner=core.get_user_hash(get_current_user_mock.return_value))
+        zip = AutograderZip(id="1", description="Test 1", state=State.building, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
+        zip2 = AutograderZip(id="2", description="Test 2", state=State.building, data=bytes("Old", "utf-8"), owner=core.get_user_hash({"name": "user"}))
+        zip3 = AutograderZip(id="3", description="Test 3", state=State.building, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
 
         with self.service.session() as session:
             session.add(zip)
@@ -128,7 +150,7 @@ class TestManageHandler(AsyncHTTPTestCase):
         response = self.fetch("/")
         assert response.code == 200
 
-        with patch.object(tornado.web.RequestHandler, "render") as mock:
+        with patch.object(tornado.web.RequestHandler, "render", new_callable=AsyncMock) as mock:
             self.fetch("/")
             mock.assert_called_once()
             args = mock.call_args
@@ -164,8 +186,7 @@ class TestManageHandler(AsyncHTTPTestCase):
         get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
         id = str(uuid.uuid4())
         with self.service.session() as session:
-            zip = AutograderZip(id=id, description="Test", ready=False, data=bytes("Old", "utf-8"),
-                                owner=core.get_user_hash({"name": "user"}))
+            zip = AutograderZip(id=id, description="Test", state=State.building, data=bytes("Old", "utf-8"), owner=core.get_user_hash({"name": "user"}))
             session.add(zip)
 
         response = self.fetch(f"/manage/edit/{id}")
@@ -176,8 +197,7 @@ class TestManageHandler(AsyncHTTPTestCase):
         get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
         id = str(uuid.uuid4())
         with self.service.session() as session:
-            zip = AutograderZip(id=id, description="Test", ready=False, data=bytes("Old", "utf-8"),
-                                owner=core.get_user_hash(get_current_user_mock.return_value))
+            zip = AutograderZip(id=id, description="Test", state=State.building, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
             session.add(zip)
 
         response = self.fetch(f"/manage/edit/{id}")
@@ -233,37 +253,35 @@ class TestManageHandler(AsyncHTTPTestCase):
         assert response.code == 403
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    @patch("livefeedback_hub.handlers.manage.executor.submit")
+    @patch("livefeedback_hub.handlers.manage.manage_executor.submit")
     def test_update_grader(self, submit: MagicMock, get_current_user_mock: MagicMock):
         get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
         id = str(uuid.uuid4())
         with self.service.session() as session:
-            zip = AutograderZip(id=id, description="Test", ready=True, data=bytes("Old", "utf-8"),
-                                owner=core.get_user_hash(get_current_user_mock.return_value))
+            zip = AutograderZip(id=id, description="Test", state=State.ready, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
             session.add(zip)
         headers, body = self.generate_request(bytes("Test", "utf-8"), "Hello")
         response = self.fetch(f"/manage/edit/{id}", method="POST", headers=headers, body=body, follow_redirects=False)
         assert response.code == 302
         submit.assert_called_once()
         with self.service.session() as session:
-            assert session.query(AutograderZip).filter_by(id=id).first().ready is False
+            assert session.query(AutograderZip).filter_by(id=id).first().state == State.building
             assert session.query(AutograderZip).filter_by(id=id).first().description == "Hello"
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    @patch("livefeedback_hub.handlers.manage.executor.submit")
+    @patch("livefeedback_hub.handlers.manage.manage_executor.submit")
     def test_update_grader_no_zip(self, submit: MagicMock, get_current_user_mock: MagicMock):
         get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
         id = str(uuid.uuid4())
         with self.service.session() as session:
-            zip = AutograderZip(id=id, description="Test", ready=True, data=bytes("Old", "utf-8"),
-                                owner=core.get_user_hash(get_current_user_mock.return_value))
+            zip = AutograderZip(id=id, description="Test", state=State.ready, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
             session.add(zip)
         headers, body = self.generate_request(None, "Hello")
         response = self.fetch(f"/manage/edit/{id}", method="POST", headers=headers, body=body, follow_redirects=False)
         assert response.code == 302
         submit.assert_not_called()
         with self.service.session() as session:
-            assert session.query(AutograderZip).filter_by(id=id).first().ready is True
+            assert session.query(AutograderZip).filter_by(id=id).first().state == State.ready
             assert session.query(AutograderZip).filter_by(id=id).first().description == "Hello"
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
@@ -277,7 +295,7 @@ class TestManageHandler(AsyncHTTPTestCase):
         get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
         response = self.fetch("/manage/add")
         assert response.code == 200
-        with patch.object(tornado.web.RequestHandler, "render") as mock:
+        with patch.object(tornado.web.RequestHandler, "render", new_callable=AsyncMock) as mock:
             self.fetch("/manage/add")
             mock.assert_called_once()
             args = mock.call_args
@@ -285,7 +303,7 @@ class TestManageHandler(AsyncHTTPTestCase):
             assert task.description == ""
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    @patch("livefeedback_hub.handlers.manage.executor.submit")
+    @patch("livefeedback_hub.handlers.manage.manage_executor.submit")
     def test_add_grader_post(self, submit: MagicMock, get_current_user_mock: MagicMock):
         get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
         headers, body = self.generate_request(bytes("Test", "utf-8"), "Hello")
@@ -293,7 +311,7 @@ class TestManageHandler(AsyncHTTPTestCase):
         assert response.code == 302
         submit.assert_called_once()
         with self.service.session() as session:
-            assert session.query(AutograderZip).first().ready is False
+            assert session.query(AutograderZip).first().state == State.building
             assert session.query(AutograderZip).first().description == "Hello"
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
@@ -311,13 +329,12 @@ class TestManageHandler(AsyncHTTPTestCase):
         assert response.code == 403
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    @patch("livefeedback_hub.handlers.manage.delete_docker_image")
+    @patch("livefeedback_hub.core.delete_docker_image")
     def test_delete(self, delete: MagicMock, get_current_user_mock: MagicMock):
         get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
         id = str(uuid.uuid4())
         with self.service.session() as session:
-            zip = AutograderZip(id=id, description="Test", ready=True, data=bytes("Old", "utf-8"),
-                                owner=core.get_user_hash(get_current_user_mock.return_value))
+            zip = AutograderZip(id=id, description="Test", state=State.ready, data=bytes("Old", "utf-8"), owner=core.get_user_hash(get_current_user_mock.return_value))
             session.add(zip)
 
         response = self.fetch(f"/manage/delete/{id}", follow_redirects=False)

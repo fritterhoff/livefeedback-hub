@@ -1,4 +1,7 @@
 {% extends "base.html" %}
+{% block title %}
+JupyterHub Live Feedback - Ergebisse {{ task.description }}
+{% end %}
 {% block content %}
 <h1>Ergebnisse</h1>
 <div id="results">
@@ -14,15 +17,15 @@
     function handleResults(data) {
         content = "";
         if (!setUp) {
-            for (const [key, value] of Object.entries(data)) {
-                if (key == "index")
+            for (const [key] of Object.entries(data)) {
+                if (key === "index")
                     continue
                 content += `<div class="result"><h2>Aufgabe ${key}:</h2><div class="chart"><canvas  width="400" height="100" role="img" id="${key}"></canvas></div></div>`;
             }
             document.getElementById("results").innerHTML = content;
         }
-        for (const [key, value] of Object.entries(data)) {
-            if (key == "index")
+        for (const [key] of Object.entries(data)) {
+            if (key === "index")
                 continue
             let cleaned = Object.fromEntries(Object.entries(data[key]).filter(([_, v]) => v != null));
             if (!setUp) {
@@ -68,6 +71,7 @@
                 handleResults(data);
             });
     }
+
     results();
     setInterval(results, 2000);
 </script>

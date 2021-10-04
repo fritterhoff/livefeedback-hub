@@ -4,3 +4,4 @@ sqlalchemy~=1.4.25
 stdio-proxy
 setuptools~=58.1.0
 tornado~=6.1
+python-on-whales~=0.26.0

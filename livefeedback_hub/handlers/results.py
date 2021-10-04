@@ -4,18 +4,15 @@ from typing import Optional
 
 import pandas as pd
 from jupyterhub.services.auth import HubOAuthenticated
-from livefeedback_hub.server import JupyterService
 from tornado import web
 from tornado.web import RequestHandler, authenticated
 
 from livefeedback_hub import core
 from livefeedback_hub.db import AutograderZip, Result
+from livefeedback_hub.server import JupyterService
 
 
-class FeedbackResultsHandler(HubOAuthenticated, RequestHandler):
-    def initialize(self, service: JupyterService):
-        self.service = service
-        self.log: logging.Logger = service.log
+class FeedbackResultsHandler(HubOAuthenticated, core.CustomRequestHandler):
 
     @authenticated
     async def get(self, live_id):

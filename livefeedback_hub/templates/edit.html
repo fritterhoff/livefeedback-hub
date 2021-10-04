@@ -1,11 +1,18 @@
 {% extends "base.html" %}
+{% block title %}
+{% if edit %}
+JupyterHub Live Feedback - Aktualisiere bestehenden Eintrag {{ task.description }}
+{% else %}
+JupyterHub Live Feedback - Neuer Eintrag
+{% end %}
+{% end %}
 {% block content %}
 <h1>
-{% if edit %}
-Aktualisiere bestehenden Eintrag
-{% else %}
-Neuer Eintrag
-{% end %}
+    {% if edit %}
+    Aktualisiere bestehenden Eintrag
+    {% else %}
+    Neuer Eintrag
+    {% end %}
 </h1>
 <form method="post" enctype="multipart/form-data">
 
@@ -13,18 +20,21 @@ Neuer Eintrag
     {% if edit %}
     <div class="mb-3">
         <label for="id" class="form-label">ID</label>
-        <input type="text" class="form-control" id="id" name="id" aria-readonly="true" readonly value="{{ task.id }}" readonly>
+        <input type="text" class="form-control" id="id" name="id" aria-readonly="true" readonly value="{{ task.id }}"
+               readonly>
     </div>
     {% end %}
-    <div  class="mb-3">
+    <div class="mb-3">
         <label for="description" class="form-label">Titel</label>
-        <input type="text" class="form-control" id="description" name="description" required value="{{ task.description }}" />
+        <input type="text" class="form-control" id="description" name="description" required
+               value="{{ task.description }}"/>
     </div>
-    <div  class="mb-3">
+    <div class="mb-3">
         <label for="zip" class="form-label">Zip-Datei</label>
-        <input type="file" class="form-control" accept=".zip" name="zip" id="zip" {% if not edit %} required {% end %} />
+        <input type="file" class="form-control" accept=".zip" name="zip" id="zip" {% if not edit %}
+               required {% end %} />
     </div>
-    <input class="btn btn-primary" type="submit" />
+    <input class="btn btn-primary" type="submit"/>
 </form>
 
 

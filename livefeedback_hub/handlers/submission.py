@@ -1,10 +1,8 @@
 import json
-import logging
 import os
 import re
 import shutil
 import tempfile
-from concurrent.futures.thread import ThreadPoolExecutor
 from io import BytesIO
 from typing import Optional, Tuple
 
@@ -12,31 +10,28 @@ import pandas as pd
 import stdio_proxy
 from jupyterhub.services.auth import HubOAuthenticated
 from otter.grade import containers, utils
-from tornado.web import RequestHandler, authenticated
+from tornado.web import authenticated
 
 from livefeedback_hub import core
+from livefeedback_hub.core import UniqueActionThreadPoolExecutor
 from livefeedback_hub.db import AutograderZip, GUID_REGEX, Result
 from livefeedback_hub.server import JupyterService
 
-executor = ThreadPoolExecutor(max_workers=16)
+submission_executor = UniqueActionThreadPoolExecutor(max_workers=16)
 
 
 def process_notebook(service: JupyterService, autograder_zip: bytes, notebook: bytes, id: str, user_hash: str):
     tmp_dir = tempfile.mkdtemp()
     fd, path = tempfile.mkstemp(suffix=".ipynb", dir=tmp_dir)
-    fd_zip, path_zip = tempfile.mkstemp(suffix=".zip", dir=tmp_dir)
     cwd = os.getcwd()
     try:
         with os.fdopen(fd, "wb") as tmp:
             tmp.write(notebook)
             tmp.flush()
-        with os.fdopen(fd_zip, "wb") as tmp:
-            tmp.write(autograder_zip)
-            tmp.flush()
 
         os.chdir(tmp_dir)
         service.log.info(f"Launching otter-grader for {user_hash} and {id}")
-        image = utils.OTTER_DOCKER_IMAGE_TAG + ":" + containers.generate_hash(os.path.basename(path_zip))
+        image = utils.OTTER_DOCKER_IMAGE_TAG + ":" + core.calcuate_zip_hash(autograder_zip)
         stdout = BytesIO()
         stderr = BytesIO()
         with stdio_proxy.redirect_stdout(stdout), stdio_proxy.redirect_stderr(stderr):
@@ -60,7 +55,7 @@ def add_or_update_results(service, user_hash, assignment_id, user_result: pd.Dat
             session.add(result)
 
 
-class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
+class FeedbackSubmissionHandler(HubOAuthenticated, core.CustomRequestHandler):
 
     @staticmethod
     def _create_pattern() -> re.Pattern:
@@ -109,10 +104,12 @@ class FeedbackSubmissionHandler(HubOAuthenticated, RequestHandler):
 
         user_hash = core.get_user_hash(self.get_current_user())
 
-        executor.submit(process_notebook, service=self.service, autograder_zip=autograder_zip,
-                        notebook=self.request.body, id=id, user_hash=user_hash)
+        def search(args):
+            if args.kwargs["user_hash"] == user_hash and args.kwargs["id"] == id:
+                return True
+            else:
+                return False
+        submission_executor.find_and_remove(search)
+        submission_executor.submit(process_notebook, service=self.service, autograder_zip=autograder_zip,
+                                   notebook=self.request.body, id=id, user_hash=user_hash)
         await self.finish()
-
-    def initialize(self, service: JupyterService):
-        self.service = service
-        self.log: logging.Logger = service.log
