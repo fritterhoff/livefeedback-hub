@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+{% from livefeedback_hub.db import State %}
 <table id="overview" class="table table-striped">
     <thead>
     <tr>
@@ -13,14 +14,16 @@
     <tr>
         <td scope="row">{{ task.id }}</td>
         <td>{{ task.description }}</td>
-    {% if task.ready %}
+        {% if task.state == State.ready %}
         <td>Ok</td>
-    {% else %}
+        {% elif task.state == State.building %}
         <td>In Verarbeitung ...</td>
-    {% end %}
+        {% else %}
+        <td>Fehler bei der Verarbeitung!</td>
+        {% end %}
         <td><a class="btn btn-primary btn-sm" href="{{ base }}results/{{ task.id }}">Ergebnisse</a>
-        <a class="btn btn-warning btn-sm" href="{{ base }}manage/edit/{{ task.id }}">Bearbeiten</a>
-        <a class="btn btn-danger btn-sm" href="{{ base }}manage/delete/{{ task.id }}">Löschen</a></td>
+            <a class="btn btn-warning btn-sm" href="{{ base }}manage/edit/{{ task.id }}">Bearbeiten</a>
+            <a class="btn btn-danger btn-sm" href="{{ base }}manage/delete/{{ task.id }}">Löschen</a></td>
     </tr>
     {% end %}
 </table>

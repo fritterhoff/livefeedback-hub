@@ -1,4 +1,7 @@
 {% extends "base.html" %}
+{% block title %}
+JupyterHub Live Feedback - Ergebisse {{ task.description }}
+{% end %}
 {% block content %}
 <h1>Ergebnisse</h1>
 <div id="results">
@@ -8,23 +11,24 @@
 <script>
 
     var setUp = false;
-
+    const charts = new Map();
 
 
     function handleResults(data) {
+        content = "";
         if (!setUp) {
-            setUp = true;
-            content = "";
-            for (const [key, value] of Object.entries(data)) {
-                if (key == "index")
+            for (const [key] of Object.entries(data)) {
+                if (key === "index")
                     continue
-                content += `<div class="result"><h2>${key}</h2><div class="chart"><canvas  width="400" height="100" role="img" id="${key}"></canvas></div></div>`;
+                content += `<div class="result"><h2>Aufgabe ${key}:</h2><div class="chart"><canvas  width="400" height="100" role="img" id="${key}"></canvas></div></div>`;
             }
             document.getElementById("results").innerHTML = content;
-            for (const [key, value] of Object.entries(data)) {
-                if (key == "index")
-                    continue
-                let cleaned = Object.fromEntries(Object.entries(data[key]).filter(([_, v]) => v != null));
+        }
+        for (const [key] of Object.entries(data)) {
+            if (key === "index")
+                continue
+            let cleaned = Object.fromEntries(Object.entries(data[key]).filter(([_, v]) => v != null));
+            if (!setUp) {
                 var chart = new Chart(document.getElementById(key), {
                     type: 'bar',
                     data: {
@@ -32,15 +36,31 @@
                         datasets: [{
                             label: "Vergebene Punkte",
                             data: Object.values(cleaned),
-                            
+                            backgroundColor: "#ffc180"
                         }]
                     },
-
+                    options: {
+                        scales: {
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Anzahl Studierende'
+                                },
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            }
+                        }
+                    }
                 });
+                charts.set(key, chart);
+            } else {
+                charts.get(key).data.labels = Object.keys(cleaned);
+                charts.get(key).data.datasets[0].data = Object.values(cleaned);
+                charts.get(key).update();
             }
         }
-
-
+        setUp = true;
     }
 
 
@@ -51,6 +71,7 @@
                 handleResults(data);
             });
     }
+
     results();
     setInterval(results, 2000);
 </script>

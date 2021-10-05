@@ -10,6 +10,8 @@ RUN cd /tmp && \
     mv ./docker/docker /usr/local/bin && \
     chmod +x /usr/local/bin/docker && rm -rf /tmp/*
 COPY --from=docker/buildx-bin /buildx /usr/libexec/docker/cli-plugins/docker-buildx
+COPY requirements.txt /tmp/extension/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/extension/requirements.txt
 COPY . /tmp/extension
 RUN cd /tmp/extension && pip install .
 
