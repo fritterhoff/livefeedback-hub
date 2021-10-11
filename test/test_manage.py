@@ -330,7 +330,7 @@ class TestManageHandler(AsyncHTTPTestCase):
         assert response.code == 403
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    @patch("livefeedback_hub.core.delete_docker_image")
+    @patch("livefeedback_hub.helper.misc.delete_docker_image")
     def test_delete(self, delete: MagicMock, get_current_user_mock: MagicMock):
         get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
         id = str(uuid.uuid4())
