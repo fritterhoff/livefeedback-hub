@@ -7,7 +7,7 @@ RUN cd /tmp && \
     mv ./docker/docker /usr/local/bin && \
     chmod +x /usr/local/bin/docker && rm -rf /tmp/* 
 
-FROM python:3-slim
+FROM python:3.9-slim
 
 COPY --from=docker/buildx-bin /buildx /usr/libexec/docker/cli-plugins/docker-buildx
 COPY --from=download /usr/local/bin/docker /usr/local/bin/docker
