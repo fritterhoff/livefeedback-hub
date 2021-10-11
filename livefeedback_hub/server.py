@@ -103,7 +103,6 @@ if __name__ == "__main__":
     if os.getenv("JUPYTERHUB_SERVICE_URL") is None:
         from unittest.mock import patch, MagicMock
 
-
         @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
         def development(get_current_user_mock: MagicMock):
             """
@@ -113,7 +112,6 @@ if __name__ == "__main__":
             get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
 
             main(xsrf_cookies=False)
-
 
         development()
     else:
