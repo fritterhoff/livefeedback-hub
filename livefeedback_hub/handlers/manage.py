@@ -18,9 +18,8 @@ from tornado.httputil import HTTPFile
 import livefeedback_hub.helper.misc
 from livefeedback_hub import core
 from livefeedback_hub.db import AutograderZip, Result, State
-from livefeedback_hub.helper.misc import teacher_only
 from livefeedback_hub.server import JupyterService
-from livefeedback_hub.helper.misc import calcuate_zip_hash, get_user_hash, delete_docker_image
+from livefeedback_hub.helper.misc import calcuate_zip_hash, get_user_hash, teacher_only
 manage_executor = ThreadPoolExecutor(max_workers=16)
 
 
@@ -67,7 +66,7 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
             return
 
         if update and calcuate_zip_hash(zip_file["body"]) != calcuate_zip_hash(item.data):
-            delete_docker_image(service, item)
+            livefeedback_hub.helper.misc.delete_docker_image(service, item)
         service.log.info(f"Marking {id} as ready")
         item.data = zip_file["body"]
         item.state = State.ready
@@ -131,7 +130,7 @@ class FeedbackZipDeleteHandler(HubOAuthenticated, core.CoreRequestHandler):
                     return
                     # Delete task from database and delete docker image
                 self.service.log.info(f"Deleting task {live_id}")
-                delete_docker_image(self.service, task)
+                livefeedback_hub.helper.misc.delete_docker_image(self.service, task)
                 session.delete(task)
             session.query(Result).filter_by(assignment=live_id).delete()
         self.redirect(self.service.prefix)

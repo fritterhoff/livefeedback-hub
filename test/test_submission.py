@@ -73,7 +73,7 @@ class TestSubmissionHandler(AsyncHTTPTestCase):
         assert response.code == 200
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    def test_submitt_no_id(self, get_current_user_mock: MagicMock):
+    def test_submit_no_id(self, get_current_user_mock: MagicMock):
         get_current_user_mock.return_value = {"name": "student"}
         response = self.fetch("/submit", method="POST", body=notebook_without_id)
         assert response.code == 200
