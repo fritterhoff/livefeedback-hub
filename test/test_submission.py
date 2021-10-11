@@ -4,7 +4,8 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 from tornado.testing import AsyncHTTPTestCase
 
-from livefeedback_hub import core
+import livefeedback_hub.helper.misc
+from livefeedback_hub import core_handler
 from livefeedback_hub.db import AutograderZip, Result, State
 from livefeedback_hub.handlers import submission
 from livefeedback_hub.server import JupyterService
@@ -88,7 +89,7 @@ class TestSubmissionHandler(AsyncHTTPTestCase):
         with self.service.session() as session:
             zip = AutograderZip(id="333e2069-612e-4e0c-a4ac-e6ec1eaa44f0", description="Test", state=State.ready,
                                 data=bytes("Old", "utf-8"),
-                                owner=core.get_user_hash(get_current_user_mock.return_value))
+                                owner=livefeedback_hub.helper.misc.get_user_hash(get_current_user_mock.return_value))
             session.add(zip)
         response = self.fetch("/submit", method="POST", body=notebook)
         assert response.code == 200
@@ -108,7 +109,7 @@ class TestSubmissionHandler(AsyncHTTPTestCase):
         with self.service.session() as session:
             zip = AutograderZip(id="333e2069-612e-4e0c-a4ac-e6ec1eaa44f0", description="Test", state=State.ready,
                                 data=bytes("Old", "utf-8"),
-                                owner=core.get_user_hash(get_current_user_mock.return_value))
+                                owner=livefeedback_hub.helper.misc.get_user_hash(get_current_user_mock.return_value))
             session.add(zip)
 
         response = self.fetch("/submit", method="POST", body=notebook)

@@ -1,24 +1,23 @@
 import io
-import logging
 from typing import Optional
 
 import pandas as pd
 from jupyterhub.services.auth import HubOAuthenticated
 from tornado import web
-from tornado.web import RequestHandler, authenticated
+from tornado.web import authenticated
 
+import livefeedback_hub.helper.misc
 from livefeedback_hub import core
 from livefeedback_hub.db import AutograderZip, Result
-from livefeedback_hub.server import JupyterService
 
 
-class FeedbackResultsHandler(HubOAuthenticated, core.CustomRequestHandler):
+class FeedbackResultsHandler(HubOAuthenticated, core.CoreRequestHandler):
 
     @authenticated
     async def get(self, live_id):
         self.log.info("Handing live feedback results request")
 
-        user_hash = core.get_user_hash(self.get_current_user())
+        user_hash = livefeedback_hub.helper.misc.get_user_hash(self.get_current_user())
 
         with self.service.session() as session:
             entry: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=live_id, owner=user_hash).first()
@@ -28,16 +27,13 @@ class FeedbackResultsHandler(HubOAuthenticated, core.CustomRequestHandler):
                 await self.render("results.html", task=entry, base=self.service.prefix)
 
 
-class FeedbackResultsApiHandler(HubOAuthenticated, RequestHandler):
-    def initialize(self, service: JupyterService):
-        self.service = service
-        self.log: logging.Logger = service.log
+class FeedbackResultsApiHandler(HubOAuthenticated, core.CoreRequestHandler):
 
     @authenticated
     async def get(self, live_id):
         self.log.info("Handing live feedback results api request")
 
-        user_hash = core.get_user_hash(self.get_current_user())
+        user_hash = livefeedback_hub.helper.misc.get_user_hash(self.get_current_user())
 
         with self.service.session() as session:
             entry: Optional[AutograderZip] = session.query(AutograderZip).filter_by(id=live_id, owner=user_hash).first()

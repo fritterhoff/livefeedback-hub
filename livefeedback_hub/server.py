@@ -53,7 +53,8 @@ class JupyterService(Application):
             session.close()
 
     def __init__(self, **kwargs):
-        from livefeedback_hub.handlers.manage import FeedbackManagementHandler, FeedbackZipAddHandler, FeedbackZipUpdateHandler, FeedbackZipDeleteHandler
+        from livefeedback_hub.handlers.manage import FeedbackManagementHandler, FeedbackZipAddHandler, \
+            FeedbackZipUpdateHandler, FeedbackZipDeleteHandler
         from livefeedback_hub.handlers.results import FeedbackResultsApiHandler, FeedbackResultsHandler
         from livefeedback_hub.handlers.submission import FeedbackSubmissionHandler
 
@@ -69,10 +70,13 @@ class JupyterService(Application):
                 (self.prefix, FeedbackManagementHandler, {"service": self}),
                 (url_path_join(self.prefix, "submit"), FeedbackSubmissionHandler, {"service": self}),
                 (url_path_join(self.prefix, "manage/add"), FeedbackZipAddHandler, {"service": self}),
-                (url_path_join(self.prefix, f"manage/edit/({GUID_REGEX})"), FeedbackZipUpdateHandler, {"service": self}),
-                (url_path_join(self.prefix, f"manage/delete/({GUID_REGEX})"), FeedbackZipDeleteHandler, {"service": self}),
+                (
+                url_path_join(self.prefix, f"manage/edit/({GUID_REGEX})"), FeedbackZipUpdateHandler, {"service": self}),
+                (url_path_join(self.prefix, f"manage/delete/({GUID_REGEX})"), FeedbackZipDeleteHandler,
+                 {"service": self}),
                 (url_path_join(self.prefix, f"results/({GUID_REGEX})"), FeedbackResultsHandler, {"service": self}),
-                (url_path_join(self.prefix, f"api/results/({GUID_REGEX})"), FeedbackResultsApiHandler, {"service": self}),
+                (url_path_join(self.prefix, f"api/results/({GUID_REGEX})"), FeedbackResultsApiHandler,
+                 {"service": self}),
                 (
                     url_path_join(self.prefix, "oauth_callback"),
                     HubOAuthCallbackHandler,
@@ -103,6 +107,7 @@ if __name__ == "__main__":
     if os.getenv("JUPYTERHUB_SERVICE_URL") is None:
         from unittest.mock import patch, MagicMock
 
+
         @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
         def development(get_current_user_mock: MagicMock):
             """
@@ -112,6 +117,7 @@ if __name__ == "__main__":
             get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
 
             main(xsrf_cookies=False)
+
 
         development()
     else:
