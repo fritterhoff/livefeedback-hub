@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 from tornado.testing import AsyncHTTPTestCase
 
 import livefeedback_hub.helper.misc
-from livefeedback_hub import core_handler
 from livefeedback_hub.db import AutograderZip, Result, State
 from livefeedback_hub.server import JupyterService
 
