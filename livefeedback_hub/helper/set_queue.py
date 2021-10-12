@@ -15,6 +15,13 @@ class SetQueue(Queue):
     def _get(self):
         return self.queue.pop()
 
+    def find(self, fn):
+        with self.mutex:
+            for item in self.queue:
+                if fn(item):
+                    return item
+            return None
+
     def find_and_remove(self, fn):
         with self.mutex:
             for item in self.queue:

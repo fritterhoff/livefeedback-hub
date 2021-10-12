@@ -10,3 +10,6 @@ class UniqueActionThreadPoolExecutor(ThreadPoolExecutor):
 
     def find_and_remove(self, fn):
         self._work_queue.find_and_remove(fn)
+
+    def find(self, fn):
+        self._work_queue.find(fn)

@@ -118,20 +118,31 @@ class FeedbackSubmissionHandler(HubOAuthenticated, core.CoreRequestHandler):
 
         user_hash = livefeedback_hub.helper.misc.get_user_hash(self.get_current_user())
 
-        def search(args):
+        def search_same_id(args):
             if args.kwargs["user_hash"] == user_hash and args.kwargs["id"] == id:
                 return True
             else:
                 return False
 
-        if user_hash in running_store:
-            with mutex:
+        def search_same_user(args):
+            if args.kwargs["user_hash"] == user_hash and args.kwargs["id"] == id:
+                return True
+            else:
+                return False
+
+        with mutex:
+            if user_hash in running_store:
                 match = next(x for x in backlog if x.user_hash == user_hash and x.id == id)
                 backlog.remove(match)
                 backlog.append(TemporarySubmission(notebook=self.request, id=id, user_hash=user_hash,
                                                    autograder_zip=autograder_zip))
-        else:
-            submission_executor.find_and_remove(search)
-            submission_executor.submit(process_notebook, service=self.service, autograder_zip=autograder_zip,
-                                       notebook=self.request.body, id=id, user_hash=user_hash)
+            else:
+                item = submission_executor.find(search_same_user)
+                if item is None or (item is not None and item.kwargs["id"] == id):
+                    submission_executor.find_and_remove(search_same_id)
+                    submission_executor.submit(process_notebook, service=self.service, autograder_zip=autograder_zip,
+                                               notebook=self.request.body, id=id, user_hash=user_hash)
+                else:
+                    backlog.append(TemporarySubmission(notebook=self.request, id=id, user_hash=user_hash,
+                                                       autograder_zip=autograder_zip))
         await self.finish()

@@ -15,11 +15,11 @@ from python_on_whales import docker
 from tornado import web
 from tornado.httputil import HTTPFile
 
-import livefeedback_hub.helper.misc
+import livefeedback_hub
 from livefeedback_hub import core
 from livefeedback_hub.db import AutograderZip, Result, State
 from livefeedback_hub.server import JupyterService
-from livefeedback_hub.helper.misc import calcuate_zip_hash, get_user_hash, teacher_only
+from livefeedback_hub.helper.misc import calcuate_zip_hash, get_user_hash, teacher_only, delete_docker_image, timeout_injector
 manage_executor = ThreadPoolExecutor(max_workers=16)
 
 
@@ -54,7 +54,7 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
                         zip_ref.extractall(tmp_dir)
                     shutil.copy(dockerfile, tmp_dir)
                     service.log.info(f"Building new image for {id} using {base} as base image")
-                    run = livefeedback_hub.helper.misc.timeout_injector(subprocess.run)
+                    run = timeout_injector(subprocess.run)
                     with unittest.mock.patch("subprocess.run", run):
                         for line in docker.build(tmp_dir, build_args={"BASE_IMAGE": base}, tags=[image], file=dockerfile, load=True, stream_logs=True):
                             service.log.debug(line)
@@ -66,7 +66,7 @@ def build(service: JupyterService, id: str, zip_file: HTTPFile, update: bool = F
             return
 
         if update and calcuate_zip_hash(zip_file["body"]) != calcuate_zip_hash(item.data):
-            livefeedback_hub.helper.misc.delete_docker_image(service, item)
+            delete_docker_image(service, item)
         service.log.info(f"Marking {id} as ready")
         item.data = zip_file["body"]
         item.state = State.ready
