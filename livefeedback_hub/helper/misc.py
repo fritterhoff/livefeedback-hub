@@ -35,7 +35,6 @@ def get_user_hash(user_model) -> str:
 
 
 def calcuate_zip_hash(data: bytes):
-    zip_hash = ""
     m = hashlib.md5()
     m.update(data)
     zip_hash = m.hexdigest()
