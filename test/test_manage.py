@@ -130,8 +130,10 @@ class TestManageHandler(AsyncHTTPTestCase):
         super().tearDown()
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    def test_load_logged_in(self, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_load_logged_in(self, teachers: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = ["admin"]
+        get_current_user_mock.return_value = {"name": "admin"}
         response = self.fetch("/")
         assert response.code == 200
 
@@ -165,26 +167,34 @@ class TestManageHandler(AsyncHTTPTestCase):
                 assert compareTasks(x, y) is True
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    def test_load_no_teacher(self, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "admin", "groups": []}
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_load_no_teacher(self, teachers: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = []
+        get_current_user_mock.return_value = {"name": "admin"}
         response = self.fetch("/")
         assert response.code == 403
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    def test_edit_no_teacher(self, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "admin", "groups": []}
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_edit_no_teacher(self, teachers: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = []
+        get_current_user_mock.return_value = {"name": "admin"}
         response = self.fetch(f"/manage/edit/{str(uuid.uuid4())}")
         assert response.code == 403
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    def test_edit_no_task(self, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_edit_no_task(self, teachers: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = ["admin"]
+        get_current_user_mock.return_value = {"name": "admin"}
         response = self.fetch(f"/manage/edit/{str(uuid.uuid4())}")
         assert response.code == 403
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    def test_edit_wrong_user(self, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "admin", "groups": ["teacher"]}
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_edit_wrong_user(self, teachers: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = ["admin"]
+        get_current_user_mock.return_value = {"name": "admin"}
         id = str(uuid.uuid4())
         with self.service.session() as session:
             zip = AutograderZip(id=id, description="Test", state=State.building, data=bytes("Old", "utf-8"), owner=get_user_hash({"name": "user"}))
@@ -194,8 +204,10 @@ class TestManageHandler(AsyncHTTPTestCase):
         assert response.code == 403
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    def test_edit_success(self, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_edit_success(self, teachers: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = ["teacher"]
+        get_current_user_mock.return_value = {"name": "teacher"}
         id = str(uuid.uuid4())
         with self.service.session() as session:
             zip = AutograderZip(id=id, description="Test", state=State.building, data=bytes("Old", "utf-8"), owner=get_user_hash(get_current_user_mock.return_value))
@@ -238,7 +250,9 @@ class TestManageHandler(AsyncHTTPTestCase):
         return (headers, body)
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    def test_update_grader_not_found(self, get_current_user_mock: MagicMock):
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_update_grader_not_found(self, teachers: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = ["teacher"]
         get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
         id = str(uuid.uuid4())
         headers, body = self.generate_request(bytes("Test", "utf-8"), "Hello")
@@ -246,7 +260,9 @@ class TestManageHandler(AsyncHTTPTestCase):
         assert response.code == 403
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    def test_update_grader_no_teacher(self, get_current_user_mock: MagicMock):
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_update_grader_no_teacher(self, teachers: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = []
         get_current_user_mock.return_value = {"name": "teacher", "groups": [""]}
         id = str(uuid.uuid4())
         headers, body = self.generate_request(bytes("Test", "utf-8"), "Hello")
@@ -255,7 +271,9 @@ class TestManageHandler(AsyncHTTPTestCase):
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
     @patch("livefeedback_hub.handlers.manage.manage_executor.submit")
-    def test_update_grader(self, submit: MagicMock, get_current_user_mock: MagicMock):
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_update_grader(self, teachers: MagicMock, submit: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = ["teacher"]
         get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
         id = str(uuid.uuid4())
         with self.service.session() as session:
@@ -271,8 +289,10 @@ class TestManageHandler(AsyncHTTPTestCase):
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
     @patch("livefeedback_hub.handlers.manage.manage_executor.submit")
-    def test_update_grader_no_zip(self, submit: MagicMock, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_update_grader_no_zip(self, teachers: MagicMock, submit: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = ["teacher"]
+        get_current_user_mock.return_value = {"name": "teacher"}
         id = str(uuid.uuid4())
         with self.service.session() as session:
             zip = AutograderZip(id=id, description="Test", state=State.ready, data=bytes("Old", "utf-8"), owner=get_user_hash(get_current_user_mock.return_value))
@@ -286,14 +306,18 @@ class TestManageHandler(AsyncHTTPTestCase):
             assert session.query(AutograderZip).filter_by(id=id).first().description == "Hello"
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    def test_add_grader_no_teacher(self, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "teacher", "groups": [""]}
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_add_grader_no_teacher(self, teachers: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = []
+        get_current_user_mock.return_value = {"name": "teacher"}
         response = self.fetch("/manage/add")
         assert response.code == 403
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    def test_add_grader(self, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_add_grader(self, teachers: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = ["teacher"]
+        get_current_user_mock.return_value = {"name": "teacher"}
         response = self.fetch("/manage/add")
         assert response.code == 200
         with patch.object(tornado.web.RequestHandler, "render", new_callable=AsyncMock) as mock:
@@ -305,8 +329,10 @@ class TestManageHandler(AsyncHTTPTestCase):
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
     @patch("livefeedback_hub.handlers.manage.manage_executor.submit")
-    def test_add_grader_post(self, submit: MagicMock, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_add_grader_post(self, teachers: MagicMock, submit: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = ["teacher"]
+        get_current_user_mock.return_value = {"name": "teacher"}
         headers, body = self.generate_request(bytes("Test", "utf-8"), "Hello")
         response = self.fetch("/manage/add", method="POST", headers=headers, body=body, follow_redirects=False)
         assert response.code == 302
@@ -316,23 +342,29 @@ class TestManageHandler(AsyncHTTPTestCase):
             assert session.query(AutograderZip).first().description == "Hello"
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    def test_delete_grader_no_teacher(self, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "teacher", "groups": [""]}
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_delete_grader_no_teacher(self, teachers: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = []
+        get_current_user_mock.return_value = {"name": "teacher"}
         id = str(uuid.uuid4())
         response = self.fetch(f"/manage/delete/{id}")
         assert response.code == 403
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
-    def test_delete_grader_no_task(self, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_delete_grader_no_task(self, teachers: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = ["teacher"]
+        get_current_user_mock.return_value = {"name": "teacher"}
         id = str(uuid.uuid4())
         response = self.fetch(f"/manage/delete/{id}")
         assert response.code == 403
 
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
     @patch("livefeedback_hub.helper.misc.delete_docker_image")
-    def test_delete(self, delete: MagicMock, get_current_user_mock: MagicMock):
-        get_current_user_mock.return_value = {"name": "teacher", "groups": ["teacher"]}
+    @patch("livefeedback_hub.helper.misc.teachers")
+    def test_delete(self, teachers: MagicMock, delete: MagicMock, get_current_user_mock: MagicMock):
+        teachers.return_value = ["teacher"]
+        get_current_user_mock.return_value = {"name": "teacher"}
         id = str(uuid.uuid4())
         with self.service.session() as session:
             zip = AutograderZip(id=id, description="Test", state=State.ready, data=bytes("Old", "utf-8"), owner=get_user_hash(get_current_user_mock.return_value))

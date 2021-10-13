@@ -1,3 +1,4 @@
+import os
 import functools
 import hashlib
 from typing import Awaitable, Callable, Optional
@@ -11,10 +12,15 @@ from livefeedback_hub.db import AutograderZip
 from livefeedback_hub.server import JupyterService
 
 
+def teachers():
+    with open(os.getenv("FEEDBACK_TEACHERS"), 'r') as f:
+        return [line.strip() for line in f.readlines()]
+
+
 def teacher_only(method: Callable[..., Optional[Awaitable[None]]]) -> Callable[..., Optional[Awaitable[None]]]:
     @functools.wraps(method)
     def wrapper(self: RequestHandler, *args, **kwargs) -> Optional[Awaitable[None]]:
-        if 'teacher' not in self.current_user['groups']:
+        if self.current_user['name'] not in teachers():
             raise HTTPError(403)
         return method(self, *args, **kwargs)
 
