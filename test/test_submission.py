@@ -135,6 +135,20 @@ class TestSubmissionHandler(AsyncHTTPTestCase):
         assert response.code == 200
         submit.assert_not_called()
 
+
+class TestQueueSubmissionHandler(AsyncHTTPTestCase):
+    service = JupyterService(xsrf_cookies=False)
+
+    def get_app(self):
+        return self.service.app
+
+    def tearDown(self):
+        with self.service.session() as session:
+            session.query(AutograderZip).delete()
+            session.query(Result).delete()
+
+        super().tearDown()
+
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
     @patch("livefeedback_hub.handlers.submission.submission_executor.submit")
     @patch("livefeedback_hub.helper.set_queue.SetQueue.find")
