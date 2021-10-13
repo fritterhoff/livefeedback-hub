@@ -119,10 +119,9 @@ class TestSubmissionHandler(AsyncHTTPTestCase):
         args = grade.call_args
         assert args.args[1] == "otter-grade:c7268757fbabf48019f4984933539d8a"
 
-
     @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
     @patch("livefeedback_hub.handlers.submission.submission_executor.submit")
-    @patch.object(livefeedback_hub.handlers.submission,"running_store", {get_user_hash({"name": "student"})})
+    @patch.object(livefeedback_hub.handlers.submission, "running_store", {get_user_hash({"name": "student"})})
     def test_submit_twice(self, submit: MagicMock, get_current_user_mock: MagicMock):
         get_current_user_mock.return_value = {"name": "student"}
 
