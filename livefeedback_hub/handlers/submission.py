@@ -3,24 +3,29 @@ import os
 import re
 import shutil
 import tempfile
-from io import BytesIO
+from multiprocessing import Lock
 from typing import Optional, Tuple
 
 import pandas as pd
-import stdio_proxy
 from jupyterhub.services.auth import HubOAuthenticated
 from otter.grade import containers, utils
 from tornado.web import authenticated
 
+import livefeedback_hub.helper.misc
 from livefeedback_hub import core
-from livefeedback_hub.core import UniqueActionThreadPoolExecutor
 from livefeedback_hub.db import AutograderZip, GUID_REGEX, Result
+from livefeedback_hub.helper.temporary_submission import TemporarySubmission
+from livefeedback_hub.helper.unique_action_thread_pool_executor import UniqueActionThreadPoolExecutor
 from livefeedback_hub.server import JupyterService
 
 submission_executor = UniqueActionThreadPoolExecutor(max_workers=16)
+backlog: list[TemporarySubmission] = list()
+running_store = set()
+mutex = Lock()
 
 
 def process_notebook(service: JupyterService, autograder_zip: bytes, notebook: bytes, id: str, user_hash: str):
+    running_store.add(user_hash)
     tmp_dir = tempfile.mkdtemp()
     fd, path = tempfile.mkstemp(suffix=".ipynb", dir=tmp_dir)
     cwd = os.getcwd()
@@ -31,11 +36,8 @@ def process_notebook(service: JupyterService, autograder_zip: bytes, notebook: b
 
         os.chdir(tmp_dir)
         service.log.info(f"Launching otter-grader for {user_hash} and {id}")
-        image = utils.OTTER_DOCKER_IMAGE_TAG + ":" + core.calcuate_zip_hash(autograder_zip)
-        stdout = BytesIO()
-        stderr = BytesIO()
-        with stdio_proxy.redirect_stdout(stdout), stdio_proxy.redirect_stderr(stderr):
-            user_result = containers.grade_assignments(path, image, debug=True, verbose=True)
+        image = utils.OTTER_DOCKER_IMAGE_TAG + ":" + livefeedback_hub.helper.misc.calcuate_zip_hash(autograder_zip)
+        user_result = containers.grade_assignments(path, image, debug=True, verbose=True)
         add_or_update_results(service, user_hash, id, user_result)
         service.log.info(f"Grading complete for {user_hash} and {id}")
     except Exception as e:
@@ -43,6 +45,14 @@ def process_notebook(service: JupyterService, autograder_zip: bytes, notebook: b
     finally:
         os.chdir(cwd)
         shutil.rmtree(tmp_dir)
+        with mutex:
+            running_store.remove(user_hash)
+            items = [x for x in backlog if x.user_hash == user_hash]
+            if len(items) > 0:
+                item = items[0]
+                submission_executor.submit(process_notebook, service=service, autograder_zip=item.autograder_zip,
+                                           notebook=item.notebook, id=item.id, user_hash=item.user_hash)
+                backlog.remove(item)
 
 
 def add_or_update_results(service, user_hash, assignment_id, user_result: pd.DataFrame):
@@ -55,7 +65,7 @@ def add_or_update_results(service, user_hash, assignment_id, user_result: pd.Dat
             session.add(result)
 
 
-class FeedbackSubmissionHandler(HubOAuthenticated, core.CustomRequestHandler):
+class FeedbackSubmissionHandler(HubOAuthenticated, core.CoreRequestHandler):
 
     @staticmethod
     def _create_pattern() -> re.Pattern:
@@ -102,14 +112,36 @@ class FeedbackSubmissionHandler(HubOAuthenticated, core.CustomRequestHandler):
             await self.finish()
             return
 
-        user_hash = core.get_user_hash(self.get_current_user())
+        user_hash = livefeedback_hub.helper.misc.get_user_hash(self.get_current_user())
 
-        def search(args):
+        def search_same_id(args):
             if args.kwargs["user_hash"] == user_hash and args.kwargs["id"] == id:
                 return True
             else:
                 return False
-        submission_executor.find_and_remove(search)
-        submission_executor.submit(process_notebook, service=self.service, autograder_zip=autograder_zip,
-                                   notebook=self.request.body, id=id, user_hash=user_hash)
+
+        def search_same_user(args):
+            if args.kwargs["user_hash"] == user_hash and args.kwargs["id"] == id:
+                return True
+            else:
+                return False
+
+        with mutex:
+            def queue_backlog():
+                matches = [x for x in backlog if x.user_hash == user_hash and x.id == id]
+                if len(matches) > 0:
+                    match = matches[0]
+                    backlog.remove(match)
+                backlog.append(TemporarySubmission(notebook=self.request.body, id=id, user_hash=user_hash, autograder_zip=autograder_zip))
+
+            if user_hash in running_store:
+                queue_backlog()
+            else:
+                item = submission_executor.find(search_same_user)
+                if item is None or (item is not None and item.kwargs["id"] == id):
+                    submission_executor.find_and_remove(search_same_id)
+                    submission_executor.submit(process_notebook, service=self.service, autograder_zip=autograder_zip,
+                                               notebook=self.request.body, id=id, user_hash=user_hash)
+                else:
+                    queue_backlog()
         await self.finish()
