@@ -12,4 +12,4 @@ class UniqueActionThreadPoolExecutor(ThreadPoolExecutor):
         self._work_queue.find_and_remove(fn)
 
     def find(self, fn):
-        self._work_queue.find(fn)
+        return self._work_queue.find(fn)

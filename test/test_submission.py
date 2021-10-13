@@ -134,3 +134,23 @@ class TestSubmissionHandler(AsyncHTTPTestCase):
         response = self.fetch("/submit", method="POST", body=notebook)
         assert response.code == 200
         submit.assert_not_called()
+
+    @patch("jupyterhub.services.auth.HubAuthenticated.get_current_user")
+    @patch("livefeedback_hub.handlers.submission.submission_executor.submit")
+    @patch("livefeedback_hub.helper.set_queue.SetQueue.find")
+    def test_submit_queue(self, find: MagicMock, submit: MagicMock, get_current_user_mock: MagicMock):
+        get_current_user_mock.return_value = {"name": "student"}
+
+        with self.service.session() as session:
+            zip = AutograderZip(id="333e2069-612e-4e0c-a4ac-e6ec1eaa44f0", description="Test", state=State.ready,
+                                data=bytes("Old", "utf-8"),
+                                owner=get_user_hash(get_current_user_mock.return_value))
+            session.add(zip)
+        find.return_value.kwargs = {"id": "Test"}
+        response = self.fetch("/submit", method="POST", body=notebook)
+        assert response.code == 200
+        submit.assert_not_called()
+        find.return_value.kwargs = {"id": "333e2069-612e-4e0c-a4ac-e6ec1eaa44f0"}
+        response = self.fetch("/submit", method="POST", body=notebook)
+        assert response.code == 200
+        submit.assert_called_once()
