@@ -50,8 +50,7 @@ def process_notebook(service: JupyterService, autograder_zip: bytes, notebook: b
             items = [x for x in backlog if x.user_hash == user_hash]
             if len(items) > 0:
                 item = items[0]
-                submission_executor.submit(process_notebook, service=service, autograder_zip=item.autograder_zip,
-                                           notebook=item.notebook, id=item.id, user_hash=item.user_hash)
+                submission_executor.submit(process_notebook, service=service, autograder_zip=item.autograder_zip, notebook=item.notebook, id=item.id, user_hash=item.user_hash)
                 backlog.remove(item)
 
 
@@ -66,10 +65,9 @@ def add_or_update_results(service, user_hash, assignment_id, user_result: pd.Dat
 
 
 class FeedbackSubmissionHandler(HubOAuthenticated, core.CoreRequestHandler):
-    
     def check_xsrf_cookie(self):
         pass
-    
+
     @staticmethod
     def _create_pattern() -> re.Pattern:
         return re.compile(r"^#\s*LIVE:\s*(%s)\s*\r?\n?$" % GUID_REGEX, re.IGNORECASE)
@@ -84,8 +82,7 @@ class FeedbackSubmissionHandler(HubOAuthenticated, core.CoreRequestHandler):
     def _get_autograding_zip(self, nb) -> Tuple[Optional[str], Optional[bytes]]:
         cells = [cell["source"] for cell in nb["cells"]]
         pattern = self._create_pattern()
-        live_ids = [self._check_line(pattern, line) for item in cells for line in item.split("\n") if
-                    self._check_line(pattern, line)]
+        live_ids = [self._check_line(pattern, line) for item in cells for line in item.split("\n") if self._check_line(pattern, line)]
 
         if len(live_ids) == 0:
             self.log.info("No live feedback id in notebook")
@@ -130,6 +127,7 @@ class FeedbackSubmissionHandler(HubOAuthenticated, core.CoreRequestHandler):
                 return False
 
         with mutex:
+
             def queue_backlog():
                 matches = [x for x in backlog if x.user_hash == user_hash and x.id == id]
                 if len(matches) > 0:
@@ -143,8 +141,7 @@ class FeedbackSubmissionHandler(HubOAuthenticated, core.CoreRequestHandler):
                 item = submission_executor.find(search_same_user)
                 if item is None or (item is not None and item.kwargs["id"] == id):
                     submission_executor.find_and_remove(search_same_id)
-                    submission_executor.submit(process_notebook, service=self.service, autograder_zip=autograder_zip,
-                                               notebook=self.request.body, id=id, user_hash=user_hash)
+                    submission_executor.submit(process_notebook, service=self.service, autograder_zip=autograder_zip, notebook=self.request.body, id=id, user_hash=user_hash)
                 else:
                     queue_backlog()
         await self.finish()
