@@ -66,7 +66,10 @@ def add_or_update_results(service, user_hash, assignment_id, user_result: pd.Dat
 
 
 class FeedbackSubmissionHandler(HubOAuthenticated, core.CoreRequestHandler):
-
+    
+    def check_xsrf_cookie(self):
+        pass
+    
     @staticmethod
     def _create_pattern() -> re.Pattern:
         return re.compile(r"^#\s*LIVE:\s*(%s)\s*\r?\n?$" % GUID_REGEX, re.IGNORECASE)
