@@ -1,4 +1,4 @@
-otter-grader~=3.2.0
+otter-grader~=3.2.1
 jupyterhub~=2.0.1
 sqlalchemy~=1.4.29
 stdio-proxy
