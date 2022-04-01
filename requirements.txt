@@ -1,6 +1,6 @@
 otter-grader~=3.2.1
 jupyterhub~=2.2.0
-sqlalchemy~=1.4.29
+sqlalchemy~=1.4.33
 stdio-proxy
 setuptools~=60.9.3
 tornado~=6.1
