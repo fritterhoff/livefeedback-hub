@@ -1,5 +1,5 @@
 otter-grader~=3.2.1
-jupyterhub~=2.2.0
+jupyterhub~=2.2.2
 sqlalchemy~=1.4.33
 stdio-proxy
 setuptools~=61.3.0
